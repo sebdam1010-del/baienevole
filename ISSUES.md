@@ -289,24 +289,32 @@ Choisir et configurer un framework frontend moderne et responsive.
 Créer un design system cohérent avec les composants de base réutilisables.
 
 **Tasks:**
-- [ ] Définir la charte graphique (couleurs, typographie)
+- [ ] Implémenter la charte graphique du brandboard (voir DESIGN-SYSTEM.md)
+  - Palette de couleurs : #131226, #DD2D4A, #DFB999, #EF7856, #F5AC44, #ABD4A9
+  - Typographie : Protest Riot (H1), League Spartan (corps)
+- [ ] Configurer Tailwind CSS avec les couleurs de la marque
 - [ ] Écrire les tests pour les composants Button
-- [ ] Créer composant Button (avec variants)
+- [ ] Créer composant Button (primary, secondary, success avec variants)
 - [ ] Écrire les tests pour Input/Form
 - [ ] Créer composants Input, Textarea, Select
 - [ ] Écrire les tests pour Card
-- [ ] Créer composant Card
+- [ ] Créer composant Card avec bordure beige
 - [ ] Écrire les tests pour Modal
 - [ ] Créer composant Modal
+- [ ] Écrire les tests pour Badge
+- [ ] Créer composant Badge (success/warning/danger/info)
 - [ ] Écrire les tests pour Table responsive
 - [ ] Créer composant Table
+- [ ] Intégrer les logos (pastille, pillule, écussons, pancartes, branche)
 - [ ] Tester la responsivité sur mobile/tablet/desktop
 
 **Critères d'acceptation:**
 - ✅ Tous les tests de composants passent
+- ✅ Charte graphique La Baie des Singes respectée
 - ✅ Composants réutilisables et documentés
 - ✅ Design responsive (mobile-first)
-- ✅ Thème cohérent et agréable
+- ✅ Accessibilité WCAG 2.1 respectée
+- ✅ Logos intégrés et optimisés
 - ✅ Documentation Storybook (optionnel)
 
 ---

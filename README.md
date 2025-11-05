@@ -37,6 +37,25 @@ Cette application permet de :
 - 🎨 Interface moderne et intuitive
 - ♿ Accessibilité (WCAG 2.1)
 
+## 🎨 Design System
+
+L'application utilise la charte graphique officielle de La Baie des Singes.
+
+**Consultez le [DESIGN-SYSTEM.md](./DESIGN-SYSTEM.md) pour :**
+- Palette de couleurs complète
+- Typographie (Protest Riot, League Spartan)
+- Composants UI (boutons, cards, badges)
+- Guidelines responsive
+- Configuration Tailwind CSS
+
+**Couleurs principales :**
+- Bleu marine : `#131226`
+- Rouge/Rose : `#DD2D4A`
+- Beige : `#DFB999`
+- Orange : `#EF7856`
+- Jaune : `#F5AC44`
+- Vert : `#ABD4A9`
+
 ## Prérequis
 
 - Node.js (version 18 ou supérieure recommandée)
