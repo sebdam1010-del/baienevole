@@ -140,7 +140,7 @@ Créer le modèle Événement et implémenter les opérations CRUD en TDD.
 
 ## Tasks
 - [ ] Écrire les tests pour le modèle Event
-- [ ] Créer le modèle Event (date, nom, description, nombre_spectateurs_attendus, nombre_benevoles_requis, saison, commentaires)
+- [ ] Créer le modèle Event (date, nom, description, horaire_arrivee, horaire_depart, nombre_spectateurs_attendus, nombre_benevoles_requis, saison, commentaires)
 - [ ] Écrire les tests pour CREATE event
 - [ ] Implémenter POST /api/events
 - [ ] Écrire les tests pour READ events
@@ -197,6 +197,9 @@ Permettre aux bénévoles de s'inscrire aux événements de manière flexible av
 - [ ] Implémenter POST /api/events/:id/register (inscription illimitée si délai > 24h)
 - [ ] Écrire les tests pour la désinscription
 - [ ] Implémenter DELETE /api/events/:id/register
+- [ ] Écrire les tests pour l'alerte email admin en cas de désinscription
+- [ ] Implémenter l'envoi automatique d'email aux admins lors d'une désinscription
+  - Contenu : nom bénévole, événement, date, horaires, nb restants
 - [ ] Écrire les tests pour le calcul du code couleur
 - [ ] Implémenter la logique d'affichage avec code couleur :
   - 🟢 Vert (#ABD4A9) : inscrits ≤ quota requis
@@ -410,13 +413,24 @@ Créer l'interface d'import CSV avec drag & drop et prévisualisation.
   {
     title: '🎨 Interface bénévole - Vue chronologique des événements (TDD)',
     body: `## Objectif
-Créer une vue chronologique responsive des événements avec code couleur discret et filtres essentiels.
+Créer la vue principale en grille 3 colonnes avec événements affichés de manière compacte, bénévoles en mode hashtag, et filtres essentiels. C'EST LA VUE LA PLUS IMPORTANTE (affichée en premier).
 
 ## Tasks
-- [ ] Écrire les tests pour l'affichage de la liste chronologique
-- [ ] Créer les cartes d'événements avec pastille de couleur discrète
-  - 🟢 Vert (quota OK) / 🟠 Orange (quota +1-2) / 🔴 Rouge (quota +3+)
-  - Pastille en coin supérieur droit (16px desktop, 12px mobile)
+- [ ] Écrire les tests pour l'affichage de la grille 3 colonnes
+- [ ] Créer la grille responsive :
+  - Desktop : 3 colonnes
+  - Tablet : 2 colonnes
+  - Mobile : 1 colonne
+- [ ] Créer les cartes d'événements compactes avec :
+  - Titre de l'événement
+  - Date (format "JJ mois YYYY")
+  - **Horaires** : "HHhMM → HHhMM" (arrivée → départ)
+  - Liste bénévoles en mode **hashtag** : #Prénom #Prénom (chips/badges compacts)
+  - Pastille de couleur discrète (coin supérieur droit)
+    - 🟢 Vert (quota OK) / 🟠 Orange (quota +1-2) / 🔴 Rouge (quota +3+)
+    - 16px desktop, 12px mobile
+  - Bouton [S'inscrire] directement sur la carte
+  - Bouton [Détails →] pour accéder au détail
   - **PAS de compteurs visibles** (ex: pas de "5/5")
 - [ ] Écrire les tests pour les filtres
 - [ ] Implémenter filtre par **Saison** (septembre à juin)

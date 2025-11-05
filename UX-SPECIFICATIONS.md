@@ -9,57 +9,64 @@ Le code couleur est informatif uniquement et ne doit pas décourager les bénév
 
 ---
 
-## 📱 Vue principale : Liste chronologique des événements
+## 📱 Vue principale : Liste des événements (grille 3 colonnes)
+
+**C'EST LA VUE LA PLUS IMPORTANTE - Affichée en premier**
 
 ### Structure de l'interface
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  LA BAIE DES SINGES - Planning Bénévoles        [Admin] │
-│                                                          │
-│  Filtres: [Saison ▼] [Année ▼]          [Export CSV]   │
-│                                                          │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  📅 15 juin 2024 - Saison 29                            │
-│  ┌────────────────────────────────────────────┐         │
-│  │ 🎭 Spectacle de marionnettes         [🟢]  │         │
-│  │                                             │         │
-│  │ 150 spectateurs attendus                   │         │
-│  │ Prévoir chaises supplémentaires            │         │
-│  │                                             │         │
-│  │ [Voir les détails →]                       │         │
-│  └────────────────────────────────────────────┘         │
-│                                                          │
-│  📅 20 septembre 2024 - Saison 30                       │
-│  ┌────────────────────────────────────────────┐         │
-│  │ 🎵 Concert acoustique                [🟠]  │         │
-│  │                                             │         │
-│  │ 200 spectateurs attendus                   │         │
-│  │ Annulation si pluie                        │         │
-│  │                                             │         │
-│  │ [Voir les détails →]                       │         │
-│  └────────────────────────────────────────────┘         │
-│                                                          │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  LA BAIE DES SINGES - Planning Bénévoles              [Admin]    │
+│                                                                   │
+│  Filtres: [Saison ▼] [Année ▼]                 [Export CSV]     │
+│                                                                   │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │ 🎭 Marionnettes  [🟢]          │  🎵 Concert   [🟠]           │
+│  │                                 │                             │
+│  │ 📅 15 juin 2024                │ 20 sept 2024                │
+│  │ ⏰ 14h00 → 17h30               │ ⏰ 18h30 → 22h00            │
+│  │                                 │                             │
+│  │ Bénévoles :                    │ Bénévoles :                 │
+│  │ #Jean #Marie #Pierre           │ #Sophie #Lucas #Emma        │
+│  │ #Sophie #Lucas                 │ #Marc #Julie #Tom           │
+│  │                                 │ #Lisa                       │
+│  │                                 │                             │
+│  │ [S'inscrire] [Détails →]      │ [S'inscrire] [Détails →]   │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+│                                                                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │ 🎪 Théâtre      [🔴]           │  ...                        │
+│  │ ...                            │                             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-### Principes de la liste
+### Principes de la liste en grille
 
 **Affichage :**
+- **Grille 3 colonnes + lignes** (desktop)
 - Vue chronologique (ordre de date)
-- Cartes d'événements avec informations essentielles
+- Cartes d'événements compactes avec infos essentielles
+- **Titre de l'événement** en haut
 - **Pastille de couleur** discrète (coin supérieur droit) :
   - 🟢 Vert (#ABD4A9) : quota OK
   - 🟠 Orange (#EF7856) : quota +1 ou +2
   - 🔴 Rouge (#DD2D4A) : quota +3 ou plus
-- **Pas de chiffres** - Aucun compteur visible
-- Design épuré et moderne
+- **Date** : format "JJ mois YYYY"
+- **Horaires** : format "HH:MM → HH:MM" (arrivée → départ)
+- **Bénévoles en mode hashtag** : #Prénom (compact, comme des chips/badges)
+- **Pas de compteurs** - Aucun chiffre visible
+- **Bouton S'inscrire** directement sur la carte
+- **Bouton Détails** pour voir plus d'infos
 
 **Responsive :**
-- Desktop : Cartes en grille (2-3 colonnes)
-- Tablet : Cartes en grille (2 colonnes)
-- Mobile : Cartes empilées (1 colonne)
+- Desktop : Grille 3 colonnes
+- Tablet : Grille 2 colonnes
+- Mobile : 1 colonne (empilé)
 
 ---
 
@@ -117,6 +124,7 @@ Année ▼
 │  ═══════════════════════════════════════════════════════ │
 │                                                          │
 │  📅 Date : 15 juin 2024                                 │
+│  ⏰ Horaires : Arrivée 14h00 → Départ 17h30            │
 │  🎪 Saison : 29                                         │
 │  👥 Spectateurs attendus : 150                          │
 │                                                          │
@@ -176,6 +184,15 @@ Année ▼
 - Les inscriptions sont closes 24h avant l'événement
 - Raison : Éviter les confusions sur la présence des bénévoles
 - Message affiché : "Les inscriptions pour cet événement sont closes (moins de 24h avant le début)"
+
+**🚨 ALERTE EMAIL EN CAS DE DÉSINSCRIPTION**
+- Si un bénévole se désinscrit → Email automatique envoyé aux admins
+- Email contient :
+  - Nom du bénévole qui s'est désinscrit
+  - Nom de l'événement
+  - Date et horaires de l'événement
+  - Nombre de bénévoles restants
+- Raison : Les admins doivent être alertés rapidement en cas de désistement
 
 ---
 

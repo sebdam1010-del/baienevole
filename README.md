@@ -164,9 +164,9 @@ Les administrateurs peuvent importer des événements en masse via un fichier CS
 ### Structure du fichier
 
 ```csv
-date,nom,description,nombre_spectateurs_attendus,nombre_benevoles_requis,saison,commentaires
-2024-06-15,Spectacle de marionnettes,Spectacle pour enfants avec les marionnettes géantes,150,5,29,Prévoir chaises supplémentaires
-2024-09-20,Concert acoustique,Concert en plein air avec artistes locaux,200,8,30,Annulation si pluie
+date,nom,description,horaire_arrivee,horaire_depart,nombre_spectateurs_attendus,nombre_benevoles_requis,saison,commentaires
+2024-06-15,Spectacle de marionnettes,Spectacle pour enfants avec les marionnettes géantes,14:00,17:30,150,5,29,Prévoir chaises supplémentaires
+2024-09-20,Concert acoustique,Concert en plein air avec artistes locaux,18:30,22:00,200,8,30,Annulation si pluie
 ```
 
 ### Colonnes requises
@@ -174,6 +174,8 @@ date,nom,description,nombre_spectateurs_attendus,nombre_benevoles_requis,saison,
 - **date** : Date de l'événement au format YYYY-MM-DD (obligatoire)
 - **nom** : Nom de l'événement (obligatoire)
 - **description** : Description détaillée de l'événement (optionnel)
+- **horaire_arrivee** : Heure d'arrivée des bénévoles au format HH:MM (obligatoire)
+- **horaire_depart** : Heure de départ estimée au format HH:MM (obligatoire)
 - **nombre_spectateurs_attendus** : Nombre de spectateurs prévus (optionnel, défaut: 0)
 - **nombre_benevoles_requis** : Nombre de bénévoles nécessaires (obligatoire) - Utilisé pour l'affichage avec code couleur
 - **saison** : Numéro de saison pour l'archivage (obligatoire) - La saison se déroule de septembre à juin
