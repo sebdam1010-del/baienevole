@@ -9,9 +9,15 @@ Plateforme web développée en Node.js pour faciliter la gestion de l'emploi du 
 
 Cette application permet de :
 - Gérer les profils des bénévoles
-- Créer et organiser des créneaux horaires
+- Créer et organiser des événements/spectacles
 - Gérer les événements (création manuelle ou import CSV)
-- Permettre aux bénévoles de s'inscrire aux créneaux disponibles
+- Système d'inscription flexible aux événements :
+  - **Inscriptions illimitées** (pas de blocage)
+  - **Indicateurs visuels** selon le nombre de bénévoles requis :
+    - 🟢 **Vert** : Dans le quota requis
+    - 🟠 **Orange** : Quota dépassé de 1 à 2 personnes
+    - 🔴 **Rouge** : Quota dépassé de plus de 2 personnes
+  - Les bénévoles peuvent toujours s'inscrire même si le quota est atteint
 - Visualiser les plannings en temps réel
 - Recevoir des notifications et rappels
 
@@ -104,7 +110,14 @@ baienevole/
   - [ ] Import d'événements via fichier CSV
   - [ ] Validation et prévisualisation des données CSV
   - [ ] Gestion des erreurs d'import
-- [ ] Système d'inscription aux créneaux
+  - [ ] Spécifier le nombre de bénévoles requis par événement
+- [ ] Système d'inscription flexible aux événements
+  - [ ] Inscription illimitée (pas de blocage)
+  - [ ] Affichage avec code couleur selon le quota :
+    - 🟢 Vert : inscriptions dans le quota requis
+    - 🟠 Orange : quota dépassé de 1 à 2 personnes
+    - 🔴 Rouge : quota dépassé de plus de 2 personnes
+  - [ ] Les bénévoles peuvent s'inscrire même si quota atteint
 - [ ] Tableau de bord pour visualiser les plannings
 - [ ] Notifications par email
 - [ ] Export des plannings (PDF, iCal)
@@ -117,9 +130,9 @@ Les administrateurs peuvent importer des événements en masse via un fichier CS
 ### Structure du fichier
 
 ```csv
-date,nom,description,nombre_spectateurs_attendus,saison,commentaires
-2024-06-15,Spectacle de marionnettes,Spectacle pour enfants avec les marionnettes géantes,150,29,Prévoir chaises supplémentaires
-2024-09-20,Concert acoustique,Concert en plein air avec artistes locaux,200,30,Annulation si pluie
+date,nom,description,nombre_spectateurs_attendus,nombre_benevoles_requis,saison,commentaires
+2024-06-15,Spectacle de marionnettes,Spectacle pour enfants avec les marionnettes géantes,150,5,29,Prévoir chaises supplémentaires
+2024-09-20,Concert acoustique,Concert en plein air avec artistes locaux,200,8,30,Annulation si pluie
 ```
 
 ### Colonnes requises
@@ -128,6 +141,7 @@ date,nom,description,nombre_spectateurs_attendus,saison,commentaires
 - **nom** : Nom de l'événement (obligatoire)
 - **description** : Description détaillée de l'événement (optionnel)
 - **nombre_spectateurs_attendus** : Nombre de spectateurs prévus (optionnel, défaut: 0)
+- **nombre_benevoles_requis** : Nombre de bénévoles nécessaires (obligatoire) - Utilisé pour l'affichage avec code couleur
 - **saison** : Numéro de saison pour l'archivage (obligatoire) - La saison se déroule de septembre à juin
 - **commentaires** : Commentaires ou notes sur l'événement (optionnel)
 
@@ -135,8 +149,21 @@ date,nom,description,nombre_spectateurs_attendus,saison,commentaires
 
 - La date doit être au format ISO (YYYY-MM-DD)
 - Le nombre de spectateurs doit être un entier positif ou zéro
+- Le nombre de bénévoles requis doit être un entier positif
 - La saison doit être un entier positif (exemple: 29 pour la saison actuelle)
 - L'encodage du fichier doit être UTF-8
+
+### Système d'affichage avec code couleur
+
+Le nombre de bénévoles inscrits est affiché avec un code couleur par rapport au quota requis :
+
+| Situation | Couleur | Exemple |
+|-----------|---------|---------|
+| **Inscriptions ≤ quota requis** | 🟢 Vert (`#ABD4A9`) | 5 inscrits / 5 requis |
+| **Quota dépassé de 1 à 2** | 🟠 Orange (`#EF7856`) | 6-7 inscrits / 5 requis |
+| **Quota dépassé de +2** | 🔴 Rouge (`#DD2D4A`) | 8+ inscrits / 5 requis |
+
+**Important** : Les inscriptions sont **illimitées**. Le code couleur est informatif uniquement et n'empêche jamais un bénévole de s'inscrire.
 
 ### Gestion des saisons
 

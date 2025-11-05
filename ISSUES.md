@@ -134,7 +134,7 @@ Créer le modèle Événement et implémenter les opérations CRUD en TDD.
 
 **Tasks:**
 - [ ] Écrire les tests pour le modèle Event
-- [ ] Créer le modèle Event (date, nom, description, nombre_spectateurs_attendus, saison, commentaires)
+- [ ] Créer le modèle Event (date, nom, description, nombre_spectateurs_attendus, nombre_benevoles_requis, saison, commentaires)
 - [ ] Écrire les tests pour CREATE event
 - [ ] Implémenter POST /api/events
 - [ ] Écrire les tests pour READ events
@@ -146,7 +146,7 @@ Créer le modèle Événement et implémenter les opérations CRUD en TDD.
 
 **Critères d'acceptation:**
 - ✅ Tous les tests passent (couverture > 90%)
-- ✅ Validation des données (date, nombre de spectateurs, saison)
+- ✅ Validation des données (date, nombre de spectateurs, nombre de bénévoles requis, saison)
 - ✅ Système d'archivage par saison (septembre à juin)
 - ✅ Routes protégées (admin uniquement pour create/update/delete)
 - ✅ Documentation API complète
@@ -184,26 +184,32 @@ Permettre aux admins d'importer des événements en masse via un fichier CSV.
 **Labels:** `feature`, `events`, `registration`, `tdd`, `priority:high`
 
 **Description:**
-Permettre aux bénévoles de s'inscrire aux événements disponibles.
+Permettre aux bénévoles de s'inscrire aux événements de manière flexible avec indicateurs visuels.
 
 **Tasks:**
 - [ ] Écrire les tests pour le modèle EventRegistration
 - [ ] Créer la table de relation Event-User (inscriptions)
 - [ ] Écrire les tests pour l'inscription à un événement
-- [ ] Implémenter POST /api/events/:id/register
+- [ ] Implémenter POST /api/events/:id/register (inscription illimitée)
 - [ ] Écrire les tests pour la désinscription
 - [ ] Implémenter DELETE /api/events/:id/register
-- [ ] Écrire les tests pour la limite de places
-- [ ] Vérifier la limite de bénévoles requis
+- [ ] Écrire les tests pour le calcul du code couleur
+- [ ] Implémenter la logique d'affichage avec code couleur :
+  - 🟢 Vert (#ABD4A9) : inscrits ≤ quota requis
+  - 🟠 Orange (#EF7856) : quota dépassé de 1 à 2
+  - 🔴 Rouge (#DD2D4A) : quota dépassé de +2
 - [ ] Écrire les tests pour les conflits d'horaire
-- [ ] Empêcher l'inscription à des événements simultanés
+- [ ] Avertir (sans bloquer) en cas d'événements simultanés
+- [ ] Afficher le statut quota dans les réponses API
 
 **Critères d'acceptation:**
 - ✅ Tous les tests passent
-- ✅ Bénévoles peuvent s'inscrire/désinscrire
-- ✅ Respect de la limite de places
-- ✅ Détection des conflits d'horaire
+- ✅ Inscriptions illimitées (pas de blocage)
+- ✅ Code couleur calculé et affiché correctement
+- ✅ Bénévoles peuvent s'inscrire même si quota dépassé
+- ✅ Détection des conflits d'horaire (avertissement seulement)
 - ✅ Historique des inscriptions disponible
+- ✅ API retourne le statut du quota (vert/orange/rouge)
 
 ---
 
