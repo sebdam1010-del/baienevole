@@ -119,6 +119,34 @@ cp .env.example .env
 npm start
 ```
 
+## Commandes de développement
+
+```bash
+# Lancer le serveur en mode développement (avec auto-reload)
+npm run dev
+
+# Lancer les tests
+npm test
+
+# Lancer les tests en mode watch (relance automatique)
+npm run test:watch
+
+# Lancer les tests avec couverture de code
+npm test
+
+# Vérifier le code avec ESLint
+npm run lint
+
+# Corriger automatiquement les erreurs ESLint
+npm run lint:fix
+
+# Formatter le code avec Prettier
+npm run format
+
+# Lancer le serveur en production
+npm start
+```
+
 ## Structure du projet
 
 ```
