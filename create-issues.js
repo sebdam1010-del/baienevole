@@ -191,8 +191,10 @@ Permettre aux bénévoles de s'inscrire aux événements de manière flexible av
 ## Tasks
 - [ ] Écrire les tests pour le modèle EventRegistration
 - [ ] Créer la table de relation Event-User (inscriptions)
+- [ ] Écrire les tests pour la vérification du délai 24h
+- [ ] Implémenter la logique : bloquer inscription si événement dans moins de 24h
 - [ ] Écrire les tests pour l'inscription à un événement
-- [ ] Implémenter POST /api/events/:id/register (inscription illimitée)
+- [ ] Implémenter POST /api/events/:id/register (inscription illimitée si délai > 24h)
 - [ ] Écrire les tests pour la désinscription
 - [ ] Implémenter DELETE /api/events/:id/register
 - [ ] Écrire les tests pour le calcul du code couleur
@@ -206,12 +208,14 @@ Permettre aux bénévoles de s'inscrire aux événements de manière flexible av
 
 ## Critères d'acceptation
 - ✅ Tous les tests passent
-- ✅ Inscriptions illimitées (pas de blocage)
+- ✅ Inscriptions bloquées si événement dans moins de 24h
+- ✅ Inscriptions illimitées (pas de blocage par quota) si délai > 24h
 - ✅ Code couleur calculé et affiché correctement
-- ✅ Bénévoles peuvent s'inscrire même si quota dépassé
+- ✅ Bénévoles peuvent s'inscrire même si quota dépassé (si délai > 24h)
 - ✅ Détection des conflits d'horaire (avertissement seulement)
 - ✅ Historique des inscriptions disponible
-- ✅ API retourne le statut du quota (vert/orange/rouge)`,
+- ✅ API retourne le statut du quota (vert/orange/rouge)
+- ✅ Message clair si inscriptions closes (< 24h)`,
     labels: ['feature', 'events', 'registration', 'tdd', 'priority:high']
   },
   {
@@ -389,31 +393,39 @@ Créer l'interface d'import CSV avec drag & drop et prévisualisation.
     labels: ['frontend', 'admin', 'csv', 'ui', 'tdd', 'priority:high']
   },
   {
-    title: '🎨 Interface bénévole - Calendrier des événements (TDD)',
+    title: '🎨 Interface bénévole - Vue chronologique des événements (TDD)',
     body: `## Objectif
-Créer un calendrier responsive pour visualiser et s'inscrire aux événements.
+Créer une vue chronologique responsive des événements avec code couleur discret et filtres essentiels.
 
 ## Tasks
-- [ ] Écrire les tests pour l'affichage du calendrier
-- [ ] Intégrer une bibliothèque de calendrier (FullCalendar ou similaire)
-- [ ] Écrire les tests pour l'affichage des événements
-- [ ] Afficher les événements disponibles
-- [ ] Écrire les tests pour l'inscription
-- [ ] Implémenter l'inscription en un clic
-- [ ] Écrire les tests pour les vues (mois/semaine/jour)
-- [ ] Ajouter les différentes vues
+- [ ] Écrire les tests pour l'affichage de la liste chronologique
+- [ ] Créer les cartes d'événements avec pastille de couleur discrète
+  - 🟢 Vert (quota OK) / 🟠 Orange (quota +1-2) / 🔴 Rouge (quota +3+)
+  - Pastille en coin supérieur droit (16px desktop, 12px mobile)
+  - **PAS de compteurs visibles** (ex: pas de "5/5")
 - [ ] Écrire les tests pour les filtres
-- [ ] Ajouter filtres par type/lieu
-- [ ] Tester la responsivité mobile
+- [ ] Implémenter filtre par **Saison** (septembre à juin)
+- [ ] Implémenter filtre par **Année** (janvier à décembre)
+- [ ] Permettre la combinaison des deux filtres
+- [ ] Écrire les tests pour la page détail événement
+- [ ] Créer la page détail avec liste simple des bénévoles inscrits
+- [ ] Écrire les tests pour l'inscription/désinscription
+- [ ] Implémenter boutons d'action [S'inscrire] / [Se désinscrire]
+- [ ] Tester la responsivité (mobile, tablet, desktop)
+  - Desktop : 2-3 colonnes de cartes
+  - Tablet : 2 colonnes
+  - Mobile : 1 colonne (empilé)
 
 ## Critères d'acceptation
 - ✅ Tous les tests passent
-- ✅ Calendrier responsive et lisible
-- ✅ Inscription intuitive
-- ✅ Multiples vues disponibles
-- ✅ Filtres fonctionnels
-- ✅ UX mobile optimisée`,
-    labels: ['frontend', 'volunteers', 'calendar', 'ui', 'tdd', 'priority:high']
+- ✅ Vue chronologique claire et épurée
+- ✅ Pastilles de couleur discrètes (pas de compteurs)
+- ✅ Filtres Saison + Année fonctionnels
+- ✅ Page détail avec liste simple des inscrits
+- ✅ Inscription/désinscription intuitive
+- ✅ Responsive sur tous les écrans
+- ✅ Conforme aux specs UX (voir UX-SPECIFICATIONS.md)`,
+    labels: ['frontend', 'volunteers', 'events-list', 'ui', 'tdd', 'priority:high']
   },
   {
     title: '🎨 Interface bénévole - Dashboard personnel (TDD)',
@@ -463,25 +475,34 @@ Implémenter un système de notifications par email pour les rappels d'événeme
     labels: ['feature', 'notifications', 'email', 'tdd', 'priority:medium']
   },
   {
-    title: '📊 Export des plannings (PDF, iCal) (TDD)',
+    title: '📊 Export CSV des événements avec bénévoles (TDD)',
     body: `## Objectif
-Permettre l'export des plannings en PDF et iCal.
+Permettre l'export CSV des événements avec la liste complète des bénévoles inscrits pour statistiques et archivage.
 
 ## Tasks
-- [ ] Écrire les tests pour l'export PDF
-- [ ] Implémenter GET /api/events/export/pdf
-- [ ] Écrire les tests pour l'export iCal
-- [ ] Implémenter GET /api/events/export/ical
-- [ ] Écrire les tests pour l'export CSV
-- [ ] Implémenter GET /api/events/export/csv
-- [ ] Tester les formats générés
+- [ ] Écrire les tests pour l'export CSV avec bénévoles
+- [ ] Implémenter GET /api/events/export/csv avec filtres
+  - Filtre par saison (septembre à juin)
+  - Filtre par année (janvier à décembre)
+  - Combinaison des deux filtres possible
+- [ ] Colonnes du CSV :
+  - date, nom, saison, nombre_spectateurs_attendus
+  - nombre_benevoles_requis, nombre_inscrits, statut_quota
+  - benevoles_inscrits (liste noms séparés par ";")
+  - commentaires
+- [ ] Écrire les tests pour le calcul du statut quota (vert/orange/rouge)
+- [ ] Tester l'export avec différents filtres
+- [ ] Export PDF (optionnel, priorité basse)
+- [ ] Export iCal (optionnel, priorité basse)
 
 ## Critères d'acceptation
 - ✅ Tous les tests passent
-- ✅ Exports PDF formatés correctement
-- ✅ iCal compatible avec calendriers standards
-- ✅ CSV structuré et réutilisable`,
-    labels: ['feature', 'export', 'tdd', 'priority:low']
+- ✅ Export CSV fonctionnel avec filtres saison + année
+- ✅ Colonnes complètes avec liste des bénévoles inscrits
+- ✅ Statut quota calculé correctement (vert/orange/rouge)
+- ✅ Utilisable pour statistiques et bilans association
+- ✅ Encodage UTF-8 pour accents français`,
+    labels: ['feature', 'export', 'tdd', 'priority:high']
   },
   {
     title: '🧪 Configuration de la couverture de code (>80%)',

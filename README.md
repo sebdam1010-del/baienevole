@@ -12,12 +12,13 @@ Cette application permet de :
 - Créer et organiser des événements/spectacles
 - Gérer les événements (création manuelle ou import CSV)
 - Système d'inscription flexible aux événements :
-  - **Inscriptions illimitées** (pas de blocage)
+  - **Inscriptions illimitées** (pas de blocage par quota)
+  - **⚠️ Délai minimum de 24h** : Inscriptions closes 24h avant l'événement
   - **Indicateurs visuels** selon le nombre de bénévoles requis :
     - 🟢 **Vert** : Dans le quota requis
     - 🟠 **Orange** : Quota dépassé de 1 à 2 personnes
     - 🔴 **Rouge** : Quota dépassé de plus de 2 personnes
-  - Les bénévoles peuvent toujours s'inscrire même si le quota est atteint
+  - Les bénévoles peuvent toujours s'inscrire même si le quota est atteint (si délai > 24h)
 - Visualiser les plannings en temps réel
 - Recevoir des notifications et rappels
 
@@ -61,6 +62,39 @@ L'application utilise la charte graphique officielle de La Baie des Singes.
 - Orange : `#EF7856`
 - Jaune : `#F5AC44`
 - Vert : `#ABD4A9`
+
+## 🎨 Spécifications UX/UI
+
+L'interface suit des principes stricts pour ne jamais freiner les inscriptions.
+
+**Consultez le [UX-SPECIFICATIONS.md](./UX-SPECIFICATIONS.md) pour :**
+- Maquettes détaillées de l'interface
+- Vue chronologique des événements
+- Affichage discret du code couleur (pastilles)
+- Filtres essentiels (Saison + Année)
+- Format des exports CSV
+- Parcours utilisateurs
+
+**Principes clés :**
+- ❌ Pas de compteurs visibles (ex: pas de "5/5")
+- ✅ Pastille de couleur discrète (vert/orange/rouge)
+- ✅ Liste simple des bénévoles inscrits (sans séparation)
+- ✅ Inscriptions toujours possibles
+
+## 📊 Exports et statistiques
+
+### Deux cycles de gestion
+
+1. **Saison** (septembre → juin) : Gestion artistique, saison 29 actuellement
+2. **Année** (janvier → décembre) : Bilan administratif de l'association
+
+### Exports CSV
+
+Format d'export pour statistiques et archivage :
+- Événements avec liste complète des bénévoles inscrits
+- Filtrable par saison ou par année
+- Colonnes : date, nom, saison, spectateurs, bénévoles requis, inscrits, statut quota, liste noms, commentaires
+- Utilisé pour les bilans de saison et les rapports annuels
 
 ## Prérequis
 
