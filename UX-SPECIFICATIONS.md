@@ -130,12 +130,12 @@ Année ▼
 │                                                          │
 │  👥 BÉNÉVOLES INSCRITS                            [🟢]  │
 │                                                          │
-│  ✓ Jean Dupont                                          │
-│  ✓ Marie Laurent                                        │
-│  ✓ Pierre Martin                                        │
-│  ✓ Sophie Bernard                                       │
-│  ✓ Lucas Petit                                          │
-│  ✓ Emma Moreau                 ← (quota dépassé)        │
+│  ✓ Jean Dupont                      Inscrit le 10/05 à 14h30 │
+│  ✓ Marie Laurent                    Inscrit le 10/05 à 15h12 │
+│  ✓ Pierre Martin                    Inscrit le 11/05 à 09h45 │
+│  ✓ Sophie Bernard                   Inscrit le 12/05 à 18h20 │
+│  ✓ Lucas Petit                      Inscrit le 13/05 à 11h05 │
+│  ✓ Emma Moreau                      Inscrit le 14/05 à 16h30 │
 │                                                          │
 │  ─────────────────────────────────────────────────────  │
 │                                                          │
@@ -146,17 +146,26 @@ Année ▼
 
 ### Affichage des bénévoles inscrits
 
-**Principe : Pas de séparation visuelle forte**
+**Principe : Liste simple et claire**
 
-- Liste simple des noms
+- Liste des noms avec **heure d'inscription**
+- Format : "Nom Prénom - Inscrit le JJ/MM à HHhMM"
 - **Pas de compteur visible** (ex : pas de "6/5")
+- **Pas d'avatar, pas de photo, pas de rôles**
 - **Pas de section séparée** ("Dans le quota" / "En surplus")
-- Juste la pastille de couleur globale en haut à droite
-- Ordre d'inscription (premier inscrit en haut)
+- Juste la pastille de couleur globale en haut à droite (indicateur non contraignant)
+- Ordre d'inscription : premier inscrit en haut
 
-**Subtilité possible (optionnel) :**
-- Les noms au-delà du quota en couleur légèrement plus claire (mais subtil)
-- Ou tous les noms de la même couleur pour ne pas stigmatiser
+**Ce qui ne doit PAS apparaître :**
+- ❌ Avatars ou photos de profil
+- ❌ Compteurs (ex: "5/5", "6 inscrits")
+- ❌ Compétences ou rôles
+- ❌ Distinction visuelle quota/surplus
+
+**Ce qui doit apparaître :**
+- ✅ Nom complet du bénévole
+- ✅ Date et heure d'inscription
+- ✅ Ordre chronologique (premier inscrit = premier affiché)
 
 **Bouton d'action :**
 - Si pas inscrit ET délai > 24h : **[S'inscrire comme bénévole]** (bouton primary rouge #DD2D4A)
@@ -417,3 +426,22 @@ Pour toute question, contactez un administrateur.
 ---
 
 **Principe cardinal : L'interface guide mais ne contraint jamais.**
+
+## ⚠️ Note importante sur l'indicateur coloré
+
+L'indicateur coloré (pastille verte/orange/rouge) est **UNIQUEMENT INFORMATIF**.
+
+**Son rôle :**
+- Permettre de se rendre compte visuellement de l'affluence
+- Donner une indication sur le quota sans être contraignant
+- Ne JAMAIS bloquer ou décourager les inscriptions (sauf délai 24h)
+
+**Ce qu'il n'est PAS :**
+- ❌ Un feu rouge qui empêche l'inscription
+- ❌ Un message d'alerte angoissant
+- ❌ Une raison de ne pas s'inscrire
+
+**Ce qu'il est :**
+- ✅ Un simple indicateur visuel discret
+- ✅ Une information passive
+- ✅ Un outil de prise de conscience, rien de plus

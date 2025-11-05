@@ -188,7 +188,7 @@ Permettre aux bénévoles de s'inscrire aux événements de manière flexible av
 
 **Tasks:**
 - [ ] Écrire les tests pour le modèle EventRegistration
-- [ ] Créer la table de relation Event-User (inscriptions)
+- [ ] Créer la table de relation Event-User (inscriptions avec timestamp)
 - [ ] Écrire les tests pour la vérification du délai 24h
 - [ ] Implémenter la logique : bloquer inscription si événement dans moins de 24h
 - [ ] Écrire les tests pour l'inscription à un événement
@@ -359,11 +359,12 @@ Créer les pages de connexion et inscription avec design responsive.
 **Labels:** `frontend`, `admin`, `events`, `ui`, `tdd`, `priority:high`
 
 **Description:**
-Créer l'interface admin pour gérer les événements (création, modification, suppression).
+Créer l'interface admin complète pour gérer les événements avec tableau détaillé, gestion manuelle des inscriptions, exports et statistiques.
 
 **Tasks:**
-- [ ] Écrire les tests pour la liste des événements
-- [ ] Créer la page liste des événements (Table responsive)
+- [ ] Écrire les tests pour le tableau des événements
+- [ ] Créer le tableau des événements avec colonnes :
+  - Date, Nom, Saison, Nombre d'inscrits, Statut quota (pastille), Actions
 - [ ] Écrire les tests pour le formulaire de création
 - [ ] Créer le formulaire de création d'événement
 - [ ] Écrire les tests pour le formulaire d'édition
@@ -371,14 +372,28 @@ Créer l'interface admin pour gérer les événements (création, modification, 
 - [ ] Écrire les tests pour la suppression
 - [ ] Implémenter la confirmation de suppression
 - [ ] Écrire les tests pour les filtres/recherche
-- [ ] Ajouter filtres et recherche
+- [ ] Ajouter filtres Saison + Année + recherche par nom
+- [ ] Écrire les tests pour la gestion manuelle des inscriptions
+- [ ] Permettre aux admins d'inscrire un bénévole manuellement (dropdown de sélection)
+- [ ] Permettre aux admins de désinscrire un bénévole (avec confirmation)
+- [ ] Écrire les tests pour l'export CSV par événement
+- [ ] Implémenter export CSV de la liste des inscrits d'un événement spécifique
+- [ ] Écrire les tests pour les statistiques
+- [ ] Afficher statistiques globales :
+  - Taux de remplissage moyen
+  - Bénévoles les plus actifs (nombre d'inscriptions)
+  - Événements avec le plus d'inscrits
 
 **Critères d'acceptation:**
 - ✅ Tous les tests passent
-- ✅ Interface responsive et intuitive
+- ✅ Tableau complet avec nombre d'inscrits et statut visible
 - ✅ CRUD complet fonctionnel
+- ✅ Admins peuvent inscrire/désinscrire manuellement
+- ✅ Export CSV par événement disponible
+- ✅ Statistiques calculées et affichées
+- ✅ Interface responsive et intuitive
 - ✅ Confirmations pour actions destructives
-- ✅ Filtres et recherche opérationnels
+- ✅ Filtres Saison + Année opérationnels
 
 ---
 
@@ -426,7 +441,10 @@ Créer une vue chronologique responsive des événements avec code couleur discr
 - [ ] Implémenter filtre par **Année** (janvier à décembre)
 - [ ] Permettre la combinaison des deux filtres
 - [ ] Écrire les tests pour la page détail événement
-- [ ] Créer la page détail avec liste simple des bénévoles inscrits
+- [ ] Créer la page détail avec liste des bénévoles inscrits
+  - Nom complet + heure d'inscription ("Inscrit le JJ/MM à HHhMM")
+  - Pas d'avatar, pas de photo, pas de rôles
+  - Ordre chronologique (premier inscrit en haut)
 - [ ] Écrire les tests pour l'inscription/désinscription
 - [ ] Implémenter boutons d'action [S'inscrire] / [Se désinscrire]
 - [ ] Tester la responsivité (mobile, tablet, desktop)
