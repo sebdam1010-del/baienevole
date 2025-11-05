@@ -98,9 +98,9 @@ Les administrateurs peuvent importer des événements en masse via un fichier CS
 ### Structure du fichier
 
 ```csv
-date,nom,description,nombre_spectateurs_attendus,commentaires
-2024-06-15,Spectacle de marionnettes,Spectacle pour enfants avec les marionnettes géantes,150,Prévoir chaises supplémentaires
-2024-06-20,Concert acoustique,Concert en plein air avec artistes locaux,200,Annulation si pluie
+date,nom,description,nombre_spectateurs_attendus,saison,commentaires
+2024-06-15,Spectacle de marionnettes,Spectacle pour enfants avec les marionnettes géantes,150,29,Prévoir chaises supplémentaires
+2024-09-20,Concert acoustique,Concert en plein air avec artistes locaux,200,30,Annulation si pluie
 ```
 
 ### Colonnes requises
@@ -109,13 +109,22 @@ date,nom,description,nombre_spectateurs_attendus,commentaires
 - **nom** : Nom de l'événement (obligatoire)
 - **description** : Description détaillée de l'événement (optionnel)
 - **nombre_spectateurs_attendus** : Nombre de spectateurs prévus (optionnel, défaut: 0)
+- **saison** : Numéro de saison pour l'archivage (obligatoire) - La saison se déroule de septembre à juin
 - **commentaires** : Commentaires ou notes sur l'événement (optionnel)
 
 ### Règles de validation
 
 - La date doit être au format ISO (YYYY-MM-DD)
 - Le nombre de spectateurs doit être un entier positif ou zéro
+- La saison doit être un entier positif (exemple: 29 pour la saison actuelle)
 - L'encodage du fichier doit être UTF-8
+
+### Gestion des saisons
+
+Les saisons se déroulent de **septembre à juin**. Chaque saison a un numéro séquentiel :
+- Saison actuelle : **29**
+- Saison 2024-2025 (sept 2024 - juin 2025) : Saison 30
+- Les événements sont archivés par saison pour faciliter la gestion historique
 
 ## Gestion du projet
 

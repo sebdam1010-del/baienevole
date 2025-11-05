@@ -134,7 +134,7 @@ Créer le modèle Événement et implémenter les opérations CRUD en TDD.
 
 **Tasks:**
 - [ ] Écrire les tests pour le modèle Event
-- [ ] Créer le modèle Event (date, nom, description, nombre_spectateurs_attendus, commentaires)
+- [ ] Créer le modèle Event (date, nom, description, nombre_spectateurs_attendus, saison, commentaires)
 - [ ] Écrire les tests pour CREATE event
 - [ ] Implémenter POST /api/events
 - [ ] Écrire les tests pour READ events
@@ -146,7 +146,8 @@ Créer le modèle Événement et implémenter les opérations CRUD en TDD.
 
 **Critères d'acceptation:**
 - ✅ Tous les tests passent (couverture > 90%)
-- ✅ Validation des données (date, nombre de spectateurs)
+- ✅ Validation des données (date, nombre de spectateurs, saison)
+- ✅ Système d'archivage par saison (septembre à juin)
 - ✅ Routes protégées (admin uniquement pour create/update/delete)
 - ✅ Documentation API complète
 
