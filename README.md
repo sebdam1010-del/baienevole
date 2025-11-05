@@ -2,6 +2,9 @@
 
 Plateforme web développée en Node.js pour faciliter la gestion de l'emploi du temps des bénévoles de la Baie des Singes.
 
+**🎯 Méthodologie : TDD (Test-Driven Development)**
+**📱 Design : Responsive et moderne (mobile-first)**
+
 ## Description
 
 Cette application permet de :
@@ -14,9 +17,25 @@ Cette application permet de :
 
 ## Technologies
 
-- **Backend**: Node.js
-- **Base de données**: À définir
-- **Frontend**: À définir
+- **Backend**: Node.js + Express.js
+- **Base de données**: PostgreSQL (recommandé)
+- **Frontend**: Framework moderne (React/Vue/Svelte) + Tailwind CSS
+- **Tests**: Jest + Supertest + Playwright/Cypress
+- **ORM**: Sequelize ou Prisma
+
+## Principes de développement
+
+### TDD (Test-Driven Development)
+- ✅ Écrire les tests **AVANT** le code
+- ✅ Pas de code sans test
+- ✅ Pas de commit si les tests ne passent pas
+- ✅ Couverture de code minimale : 80%
+
+### Responsive Design
+- 📱 Mobile-first approach
+- 💻 Compatible mobile, tablette et desktop
+- 🎨 Interface moderne et intuitive
+- ♿ Accessibilité (WCAG 2.1)
 
 ## Prérequis
 
@@ -99,6 +118,30 @@ Accueil visiteurs,Accueil et orientation des visiteurs,2024-06-16 14:00,2024-06-
 - La date de fin doit être postérieure à la date de début
 - Le nombre de bénévoles doit être un entier positif
 - L'encodage du fichier doit être UTF-8
+
+## Gestion du projet
+
+Ce projet utilise les issues GitHub pour jalonner le développement. 25 issues détaillées ont été créées pour organiser le travail.
+
+### Créer les issues
+
+Consultez le fichier [SETUP-ISSUES.md](./SETUP-ISSUES.md) pour créer automatiquement toutes les issues sur GitHub.
+
+```bash
+# Méthode automatique avec l'API GitHub
+export GITHUB_TOKEN=your_token
+node create-issues.js
+```
+
+### Documentation des issues
+
+Le fichier [ISSUES.md](./ISSUES.md) contient le détail de toutes les 25 issues organisées par phases :
+- Phase 1 : Setup (3 issues)
+- Phase 2 : Backend Core (5 issues)
+- Phase 3 : Backend Extended (2 issues)
+- Phase 4 : Frontend (7 issues)
+- Phase 5 : Features avancées (5 issues)
+- Phase 6 : Documentation & Déploiement (3 issues)
 
 ## Contribution
 
