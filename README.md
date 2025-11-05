@@ -98,25 +98,23 @@ Les administrateurs peuvent importer des événements en masse via un fichier CS
 ### Structure du fichier
 
 ```csv
-nom,description,date_debut,date_fin,lieu,nombre_benevoles_requis
-Nettoyage plage,Nettoyage de la plage principale,2024-06-15 09:00,2024-06-15 12:00,Plage des Singes,5
-Accueil visiteurs,Accueil et orientation des visiteurs,2024-06-16 14:00,2024-06-16 18:00,Entrée principale,3
+date,nom,description,nombre_spectateurs_attendus,commentaires
+2024-06-15,Spectacle de marionnettes,Spectacle pour enfants avec les marionnettes géantes,150,Prévoir chaises supplémentaires
+2024-06-20,Concert acoustique,Concert en plein air avec artistes locaux,200,Annulation si pluie
 ```
 
 ### Colonnes requises
 
+- **date** : Date de l'événement au format YYYY-MM-DD (obligatoire)
 - **nom** : Nom de l'événement (obligatoire)
 - **description** : Description détaillée de l'événement (optionnel)
-- **date_debut** : Date et heure de début au format YYYY-MM-DD HH:MM (obligatoire)
-- **date_fin** : Date et heure de fin au format YYYY-MM-DD HH:MM (obligatoire)
-- **lieu** : Lieu de l'événement (optionnel)
-- **nombre_benevoles_requis** : Nombre de bénévoles nécessaires (optionnel, défaut: 1)
+- **nombre_spectateurs_attendus** : Nombre de spectateurs prévus (optionnel, défaut: 0)
+- **commentaires** : Commentaires ou notes sur l'événement (optionnel)
 
 ### Règles de validation
 
-- Les dates doivent être au format ISO (YYYY-MM-DD HH:MM)
-- La date de fin doit être postérieure à la date de début
-- Le nombre de bénévoles doit être un entier positif
+- La date doit être au format ISO (YYYY-MM-DD)
+- Le nombre de spectateurs doit être un entier positif ou zéro
 - L'encodage du fichier doit être UTF-8
 
 ## Gestion du projet
