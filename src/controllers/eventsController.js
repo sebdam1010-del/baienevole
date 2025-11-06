@@ -637,3 +637,125 @@ exports.unregisterFromEvent = async (req, res) => {
     });
   }
 };
+
+// Export events as CSV
+exports.exportEventsCSV = async (req, res) => {
+  try {
+    const { saison, annee } = req.query;
+
+    // Build filter conditions
+    const where = {};
+
+    if (saison) {
+      where.saison = parseInt(saison);
+    }
+
+    if (annee) {
+      const year = parseInt(annee);
+      where.date = {
+        gte: new Date(`${year}-01-01`),
+        lte: new Date(`${year}-12-31`),
+      };
+    }
+
+    // Fetch events with registrations
+    const events = await db.event.findMany({
+      where,
+      include: {
+        registrations: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        date: 'asc',
+      },
+    });
+
+    // Build CSV header
+    const header = [
+      'date',
+      'nom',
+      'saison',
+      'nombre_spectateurs_attendus',
+      'nombre_bénévoles_requis',
+      'nombre_inscrits',
+      'statut_quota',
+      'bénévoles_inscrits',
+      'commentaires',
+    ].join(',');
+
+    // Build CSV rows
+    const rows = events.map((event) => {
+      const registeredCount = event.registrations.length;
+      const requiredCount = event.nombreBenevolesRequis;
+
+      // Calculate quota status
+      let status;
+      const diff = registeredCount - requiredCount;
+      if (diff <= 0) {
+        status = 'GREEN';
+      } else if (diff <= 2) {
+        status = 'ORANGE';
+      } else {
+        status = 'RED';
+      }
+
+      // Build list of registered volunteers (sorted by registration date)
+      const sortedRegistrations = [...event.registrations].sort(
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+      );
+      const volunteersList = sortedRegistrations
+        .map((reg) => `${reg.user.firstName} ${reg.user.lastName}`)
+        .join(';');
+
+      // Format date as YYYY-MM-DD
+      const dateStr = event.date.toISOString().split('T')[0];
+
+      // Escape fields that might contain commas or quotes
+      const escapeCSV = (field) => {
+        if (field === null || field === undefined) return '';
+        const str = String(field);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      return [
+        dateStr,
+        escapeCSV(event.nom),
+        event.saison,
+        event.nombreSpectatursAttendus,
+        requiredCount,
+        registeredCount,
+        status,
+        escapeCSV(volunteersList),
+        escapeCSV(event.commentaires),
+      ].join(',');
+    });
+
+    // Combine header and rows
+    const csv = [header, ...rows].join('\n');
+
+    // Set response headers
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="events-export-${new Date().toISOString().split('T')[0]}.csv"`
+    );
+
+    res.status(200).send(csv);
+  } catch (error) {
+    console.error('Export CSV error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+};

@@ -22,6 +22,7 @@ const upload = multer({
 
 // Public routes (read-only)
 router.get('/', eventsController.getAllEvents);
+router.get('/export/csv', eventsController.exportEventsCSV);
 router.get('/:id', eventsController.getEventById);
 
 // Protected routes (admin only)
