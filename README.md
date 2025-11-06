@@ -1,5 +1,7 @@
 # Baie des Singes - Plateforme de Gestion des Bénévoles
 
+[![CI](https://github.com/sebdam1010-del/baienevole/actions/workflows/ci.yml/badge.svg)](https://github.com/sebdam1010-del/baienevole/actions/workflows/ci.yml)
+
 Plateforme web développée en Node.js pour faciliter la gestion de l'emploi du temps des bénévoles de la Baie des Singes.
 
 **🎯 Méthodologie : TDD (Test-Driven Development)**
