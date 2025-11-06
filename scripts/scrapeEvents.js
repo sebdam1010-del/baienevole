@@ -126,29 +126,9 @@ function parseFrenchDate(dateStr) {
 }
 
 /**
- * Scrape les événements du site
+ * Scrape les événements d'une page
  */
-async function scrapeEvents() {
-  log.info('Démarrage du scraping...');
-
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
-
-  try {
-    const page = await browser.newPage();
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    );
-
-    log.info(`Navigation vers ${SITE_URL}...`);
-    await page.goto(SITE_URL, {
-      waitUntil: 'networkidle2',
-      timeout: 30000,
-    });
-
-    log.info('Extraction des événements...');
+async function scrapeEventsFromPage(page) {
 
     // Extraire les événements depuis le JSON-LD (The Events Calendar)
     const events = await page.evaluate(() => {
@@ -226,9 +206,81 @@ async function scrapeEvents() {
       return eventsList;
     });
 
-    log.success(`${events.length} événement(s) trouvé(s)`);
+  return events;
+}
 
-    if (events.length === 0) {
+/**
+ * Scrape toutes les pages d'événements avec pagination
+ */
+async function scrapeEvents() {
+  log.info('Démarrage du scraping avec pagination...');
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    );
+
+    let allEvents = [];
+    let pageNumber = 1;
+    let hasMorePages = true;
+
+    while (hasMorePages) {
+      const url = pageNumber === 1
+        ? SITE_URL
+        : `${SITE_URL}page/${pageNumber}/`;
+
+      log.info(`📄 Page ${pageNumber}: Navigation vers ${url}...`);
+
+      try {
+        const response = await page.goto(url, {
+          waitUntil: 'networkidle2',
+          timeout: 30000,
+        });
+
+        // Vérifier si la page existe (pas de 404)
+        if (response.status() === 404) {
+          log.warning(`Page ${pageNumber} inexistante (404), arrêt de la pagination`);
+          hasMorePages = false;
+          break;
+        }
+
+        log.info(`Extraction des événements de la page ${pageNumber}...`);
+        const pageEvents = await scrapeEventsFromPage(page);
+
+        log.success(`${pageEvents.length} événement(s) trouvé(s) sur la page ${pageNumber}`);
+
+        if (pageEvents.length === 0) {
+          log.warning(`Aucun événement sur la page ${pageNumber}, arrêt de la pagination`);
+          hasMorePages = false;
+          break;
+        }
+
+        // Ajouter les événements à la liste totale
+        allEvents = allEvents.concat(pageEvents);
+        pageNumber++;
+
+        // Pause de 1s entre chaque page pour ne pas surcharger le serveur
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+      } catch (error) {
+        if (error.message.includes('404') || error.message.includes('net::ERR_ABORTED')) {
+          log.warning(`Page ${pageNumber} non accessible, arrêt de la pagination`);
+          hasMorePages = false;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    log.success(`🎉 Total: ${allEvents.length} événement(s) trouvé(s) sur ${pageNumber - 1} page(s)`);
+
+    if (allEvents.length === 0) {
       log.warning('Aucun événement trouvé. Vérifiez les sélecteurs CSS.');
       log.info('Sauvegarde du HTML pour débogage...');
       const html = await page.content();
@@ -236,7 +288,7 @@ async function scrapeEvents() {
       log.info('HTML sauvegardé dans debug-scraping.html');
     }
 
-    return events;
+    return allEvents;
   } finally {
     await browser.close();
   }
@@ -345,20 +397,34 @@ async function convertToDbFormat(scrapedEvent) {
 async function saveEvents(events) {
   let created = 0;
   let updated = 0;
+  let skipped = 0;
   let errors = 0;
 
-  for (const scrapedEvent of events) {
+  // Éliminer les doublons dans les événements scrapés (même URL)
+  const uniqueEvents = [];
+  const seenUrls = new Set();
+
+  for (const event of events) {
+    if (!event.urlSite || seenUrls.has(event.urlSite)) {
+      skipped++;
+      continue;
+    }
+    seenUrls.add(event.urlSite);
+    uniqueEvents.push(event);
+  }
+
+  if (skipped > 0) {
+    log.warning(`${skipped} doublon(s) détecté(s) dans le scraping, ignorés`);
+  }
+
+  for (const scrapedEvent of uniqueEvents) {
     try {
       const dbEvent = await convertToDbFormat(scrapedEvent);
 
-      // Vérifier si l'événement existe déjà (par nom et date)
+      // Vérifier si l'événement existe déjà (par URL du site - identifiant unique)
       const existing = await prisma.event.findFirst({
         where: {
-          nom: dbEvent.nom,
-          date: {
-            gte: new Date(dbEvent.date.setHours(0, 0, 0, 0)),
-            lt: new Date(dbEvent.date.setHours(23, 59, 59, 999)),
-          },
+          urlSite: dbEvent.urlSite,
         },
       });
 
@@ -368,14 +434,14 @@ async function saveEvents(events) {
           where: { id: existing.id },
           data: dbEvent,
         });
-        log.info(`Mis à jour: ${dbEvent.nom}`);
+        log.info(`⟳ Mis à jour: ${dbEvent.nom}`);
         updated++;
       } else {
         // Créer un nouvel événement
         await prisma.event.create({
           data: dbEvent,
         });
-        log.success(`Créé: ${dbEvent.nom}`);
+        log.success(`✓ Créé: ${dbEvent.nom}`);
         created++;
       }
     } catch (error) {
@@ -384,7 +450,7 @@ async function saveEvents(events) {
     }
   }
 
-  return { created, updated, errors };
+  return { created, updated, skipped, errors };
 }
 
 /**
@@ -415,10 +481,13 @@ async function main() {
     console.log('\n╔════════════════════════════════════════════╗');
     console.log('║              Résumé                        ║');
     console.log('╚════════════════════════════════════════════╝\n');
-    log.success(`Événements créés: ${stats.created}`);
-    log.info(`Événements mis à jour: ${stats.updated}`);
+    log.success(`✓ Événements créés: ${stats.created}`);
+    log.info(`⟳ Événements mis à jour: ${stats.updated}`);
+    if (stats.skipped > 0) {
+      log.warning(`⊘ Doublons ignorés: ${stats.skipped}`);
+    }
     if (stats.errors > 0) {
-      log.error(`Erreurs: ${stats.errors}`);
+      log.error(`✗ Erreurs: ${stats.errors}`);
     }
     console.log('');
   } catch (error) {

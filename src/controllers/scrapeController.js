@@ -34,6 +34,7 @@ const scrapeAndImportEvents = async (req, res) => {
         found: events.length,
         created: stats.created,
         updated: stats.updated,
+        skipped: stats.skipped || 0,
         errors: stats.errors,
       },
     });
