@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/* Import Google Fonts - Protest Riot and League Spartan */
+@import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;500;600;700&family=Protest+Riot&display=swap');
+
+@theme {
+  --color-baie-navy: #131226;
+  --color-baie-red: #DD2D4A;
+  --color-baie-beige: #DFB999;
+  --color-baie-orange: #EF7856;
+  --color-baie-yellow: #F5AC44;
+  --color-baie-green: #ABD4A9;
+
+  --font-family-protest: "Protest Riot", sans-serif;
+  --font-family-spartan: "League Spartan", sans-serif;
+}
+
+body {
+  font-family: var(--font-family-spartan);
+  color: var(--color-baie-navy);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-family-protest);
+}
