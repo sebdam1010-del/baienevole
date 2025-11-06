@@ -27,12 +27,14 @@ const adminRoutes = require('./routes/adminRoutes');
 const eventsRoutes = require('./routes/eventsRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const volunteersRoutes = require('./routes/volunteersRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/volunteers', volunteersRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Gestion des routes non trouvées
 app.use((req, res) => {
