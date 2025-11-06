@@ -30,4 +30,8 @@ router.post('/import', requireAuth, isAdmin, upload.single('file'), eventsContro
 router.put('/:id', requireAuth, isAdmin, eventsController.updateEvent);
 router.delete('/:id', requireAuth, isAdmin, eventsController.deleteEvent);
 
+// Registration routes (authenticated volunteers)
+router.post('/:id/register', requireAuth, eventsController.registerForEvent);
+router.delete('/:id/register', requireAuth, eventsController.unregisterFromEvent);
+
 module.exports = router;

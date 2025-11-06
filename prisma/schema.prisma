@@ -16,27 +16,43 @@ enum Role {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  firstName String
-  lastName  String
-  role      Role     @default(VOLUNTEER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String              @id @default(uuid())
+  email          String              @unique
+  password       String
+  firstName      String
+  lastName       String
+  role           Role                @default(VOLUNTEER)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  registrations  EventRegistration[]
 }
 
 model Event {
-  id                           String   @id @default(uuid())
+  id                           String              @id @default(uuid())
   date                         DateTime
   nom                          String
   description                  String?
-  horaireArrivee              String   // Format: "HH:MM"
-  horaireDepart               String   // Format: "HH:MM"
-  nombreSpectatursAttendus    Int      @default(0)
+  horaireArrivee              String              // Format: "HH:MM"
+  horaireDepart               String              // Format: "HH:MM"
+  nombreSpectatursAttendus    Int                 @default(0)
   nombreBenevolesRequis       Int
   saison                       Int
   commentaires                 String?
-  createdAt                    DateTime @default(now())
-  updatedAt                    DateTime @updatedAt
+  createdAt                    DateTime            @default(now())
+  updatedAt                    DateTime            @updatedAt
+  registrations                EventRegistration[]
+}
+
+model EventRegistration {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
 }

@@ -1,6 +1,42 @@
 const db = require('../utils/db');
 const { parse } = require('csv-parse/sync');
 
+// Helper to calculate quota status
+const calculateQuotaStatus = (registered, required) => {
+  const diff = registered - required;
+
+  if (diff <= 0) {
+    return { color: 'green', code: '#ABD4A9', registered, required };
+  } else if (diff <= 2) {
+    return { color: 'orange', code: '#EF7856', registered, required };
+  } else {
+    return { color: 'red', code: '#DD2D4A', registered, required };
+  }
+};
+
+// Helper to check if event is within 24 hours
+const isWithin24Hours = (eventDate) => {
+  const now = new Date();
+  const timeDiff = eventDate.getTime() - now.getTime();
+  const hoursDiff = timeDiff / (1000 * 60 * 60);
+  return hoursDiff < 24;
+};
+
+// Helper to check for time conflicts
+const checkTimeConflict = (time1Start, time1End, time2Start, time2End) => {
+  const [h1s, m1s] = time1Start.split(':').map(Number);
+  const [h1e, m1e] = time1End.split(':').map(Number);
+  const [h2s, m2s] = time2Start.split(':').map(Number);
+  const [h2e, m2e] = time2End.split(':').map(Number);
+
+  const start1 = h1s * 60 + m1s;
+  const end1 = h1e * 60 + m1e;
+  const start2 = h2s * 60 + m2s;
+  const end2 = h2e * 60 + m2e;
+
+  return (start1 < end2 && end1 > start2);
+};
+
 // Helper to validate date format (YYYY-MM-DD)
 const isValidDate = (dateString) => {
   const regex = /^\d{4}-\d{2}-\d{2}$/;
@@ -98,9 +134,27 @@ exports.getAllEvents = async (req, res) => {
       orderBy: {
         date: 'asc',
       },
+      include: {
+        registrations: true,
+      },
     });
 
-    res.status(200).json(events);
+    // Add quota status to each event
+    const eventsWithQuota = events.map((event) => {
+      const quotaStatus = calculateQuotaStatus(
+        event.registrations.length,
+        event.nombreBenevolesRequis
+      );
+
+      // Remove registrations from response, only keep quota status
+      const { registrations, ...eventData } = event;
+      return {
+        ...eventData,
+        quotaStatus,
+      };
+    });
+
+    res.status(200).json(eventsWithQuota);
   } catch (error) {
     console.error('Get all events error:', error);
     res.status(500).json({
@@ -116,6 +170,9 @@ exports.getEventById = async (req, res) => {
 
     const event = await db.event.findUnique({
       where: { id },
+      include: {
+        registrations: true,
+      },
     });
 
     if (!event) {
@@ -124,7 +181,17 @@ exports.getEventById = async (req, res) => {
       });
     }
 
-    res.status(200).json(event);
+    // Add quota status
+    const quotaStatus = calculateQuotaStatus(
+      event.registrations.length,
+      event.nombreBenevolesRequis
+    );
+
+    const { registrations, ...eventData } = event;
+    res.status(200).json({
+      ...eventData,
+      quotaStatus,
+    });
   } catch (error) {
     console.error('Get event by id error:', error);
     res.status(500).json({
@@ -408,6 +475,163 @@ exports.importEvents = async (req, res) => {
     });
   } catch (error) {
     console.error('Import events error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+};
+
+// REGISTER - POST /api/events/:id/register
+exports.registerForEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Check if event exists
+    const event = await db.event.findUnique({
+      where: { id },
+      include: {
+        registrations: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      return res.status(404).json({
+        error: 'Event not found',
+      });
+    }
+
+    // Check if event is within 24 hours
+    if (isWithin24Hours(event.date)) {
+      return res.status(400).json({
+        error: 'Registration closed. Events must be registered at least 24 hours in advance.',
+      });
+    }
+
+    // Check if already registered
+    const existingRegistration = await db.eventRegistration.findFirst({
+      where: {
+        eventId: id,
+        userId: userId,
+      },
+    });
+
+    if (existingRegistration) {
+      return res.status(400).json({
+        error: 'You are already registered for this event',
+      });
+    }
+
+    // Check for time conflicts with user's other registrations
+    const userRegistrations = await db.eventRegistration.findMany({
+      where: {
+        userId: userId,
+      },
+      include: {
+        event: true,
+      },
+    });
+
+    let hasConflict = false;
+    const conflictingEvents = [];
+
+    for (const reg of userRegistrations) {
+      // Check if same date
+      const regDate = new Date(reg.event.date);
+      const eventDate = new Date(event.date);
+
+      if (
+        regDate.getFullYear() === eventDate.getFullYear() &&
+        regDate.getMonth() === eventDate.getMonth() &&
+        regDate.getDate() === eventDate.getDate()
+      ) {
+        // Check if time overlaps
+        if (checkTimeConflict(
+          reg.event.horaireArrivee,
+          reg.event.horaireDepart,
+          event.horaireArrivee,
+          event.horaireDepart
+        )) {
+          hasConflict = true;
+          conflictingEvents.push(reg.event.nom);
+        }
+      }
+    }
+
+    // Create registration
+    const registration = await db.eventRegistration.create({
+      data: {
+        eventId: id,
+        userId: userId,
+      },
+    });
+
+    const response = {
+      message: 'Successfully registered for event',
+      registration,
+    };
+
+    // Add warning if there's a conflict
+    if (hasConflict) {
+      response.warning = `Time conflict detected with: ${conflictingEvents.join(', ')}`;
+    }
+
+    res.status(201).json(response);
+  } catch (error) {
+    console.error('Register for event error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+};
+
+// UNREGISTER - DELETE /api/events/:id/register
+exports.unregisterFromEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Check if event exists
+    const event = await db.event.findUnique({
+      where: { id },
+    });
+
+    if (!event) {
+      return res.status(404).json({
+        error: 'Event not found',
+      });
+    }
+
+    // Find registration
+    const registration = await db.eventRegistration.findFirst({
+      where: {
+        eventId: id,
+        userId: userId,
+      },
+    });
+
+    if (!registration) {
+      return res.status(404).json({
+        error: 'You are not registered for this event',
+      });
+    }
+
+    // Delete registration
+    await db.eventRegistration.delete({
+      where: {
+        id: registration.id,
+      },
+    });
+
+    res.status(200).json({
+      message: 'Successfully unregistered from event',
+    });
+  } catch (error) {
+    console.error('Unregister from event error:', error);
     res.status(500).json({
       error: 'Internal server error',
     });
