@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Input, Select, Badge, Card } from '../../components/ui';
+import { Table, Button, Modal, Input, Select, Badge, Card, Textarea } from '../../components/ui';
 import api from '../../services/api';
 
 const AdminEvents = () => {
@@ -30,6 +30,9 @@ const AdminEvents = () => {
     horaireDepart: '',
     saison: 1,
     nombreBenevolesRequis: 5,
+    nombreSpectatursAttendus: 0,
+    description: '',
+    commentaires: '',
   });
 
   // Statistics
@@ -132,7 +135,11 @@ const AdminEvents = () => {
 
   const handleEventFormChange = (e) => {
     const { name, value } = e.target;
-    setEventFormData(prev => ({ ...prev, [name]: value }));
+    // Convert numeric fields to numbers
+    const processedValue = ['saison', 'nombreBenevolesRequis', 'nombreSpectatursAttendus'].includes(name)
+      ? parseInt(value) || 0
+      : value;
+    setEventFormData(prev => ({ ...prev, [name]: processedValue }));
   };
 
   const handleCreateEvent = () => {
@@ -144,6 +151,9 @@ const AdminEvents = () => {
       horaireDepart: '',
       saison: 1,
       nombreBenevolesRequis: 5,
+      nombreSpectatursAttendus: 0,
+      description: '',
+      commentaires: '',
     });
     setIsEventModalOpen(true);
   };
@@ -157,6 +167,9 @@ const AdminEvents = () => {
       horaireDepart: event.horaireDepart,
       saison: event.saison,
       nombreBenevolesRequis: event.nombreBenevolesRequis,
+      nombreSpectatursAttendus: event.nombreSpectatursAttendus || 0,
+      description: event.description || '',
+      commentaires: event.commentaires || '',
     });
     setIsEventModalOpen(true);
   };
@@ -508,6 +521,36 @@ const AdminEvents = () => {
               required
             />
           </div>
+
+          <Input
+            label="Nombre de spectateurs attendus"
+            type="number"
+            name="nombreSpectatursAttendus"
+            value={eventFormData.nombreSpectatursAttendus}
+            onChange={handleEventFormChange}
+            min="0"
+            helperText="Optionnel"
+          />
+
+          <Textarea
+            label="Description"
+            name="description"
+            value={eventFormData.description}
+            onChange={handleEventFormChange}
+            placeholder="Description de l'événement..."
+            rows={3}
+            helperText="Optionnel"
+          />
+
+          <Textarea
+            label="Commentaires"
+            name="commentaires"
+            value={eventFormData.commentaires}
+            onChange={handleEventFormChange}
+            placeholder="Commentaires additionnels..."
+            rows={2}
+            helperText="Optionnel"
+          />
         </form>
       </Modal>
 

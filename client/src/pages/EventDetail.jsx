@@ -11,6 +11,8 @@ const EventDetail = () => {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     fetchEvent();
@@ -59,19 +61,35 @@ const EventDetail = () => {
 
   const handleRegister = async () => {
     try {
+      setActionLoading(true);
+      setError('');
+      setSuccessMessage('');
       await api.post(`/events/${id}/register`);
-      fetchEvent(); // Refresh to show updated registration
+      setSuccessMessage('Inscription réussie !');
+      await fetchEvent(); // Refresh to show updated registration
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur lors de l\'inscription');
+    } finally {
+      setActionLoading(false);
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
     }
   };
 
   const handleUnregister = async () => {
     try {
+      setActionLoading(true);
+      setError('');
+      setSuccessMessage('');
       await api.delete(`/events/${id}/register`);
-      fetchEvent(); // Refresh to show updated registration
+      setSuccessMessage('Désinscription réussie !');
+      await fetchEvent(); // Refresh to show updated registration
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur lors de la désinscription');
+    } finally {
+      setActionLoading(false);
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
     }
   };
 
@@ -106,6 +124,19 @@ const EventDetail = () => {
           }}
         >
           {error}
+        </div>
+      )}
+
+      {successMessage && (
+        <div
+          className="p-3 rounded border text-sm"
+          style={{
+            backgroundColor: '#D1FAE5',
+            borderColor: 'var(--color-baie-green)',
+            color: '#065F46',
+          }}
+        >
+          {successMessage}
         </div>
       )}
 
@@ -172,15 +203,17 @@ const EventDetail = () => {
               <Button
                 variant="danger"
                 onClick={handleUnregister}
+                disabled={actionLoading}
               >
-                Se désinscrire
+                {actionLoading ? 'Désinscription...' : 'Se désinscrire'}
               </Button>
             ) : (
               <Button
                 variant="primary"
                 onClick={handleRegister}
+                disabled={actionLoading}
               >
-                S'inscrire à cet événement
+                {actionLoading ? 'Inscription...' : 'S\'inscrire à cet événement'}
               </Button>
             )}
           </div>

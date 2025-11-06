@@ -1,6 +1,13 @@
 const express = require('express');
+const cors = require('cors');
 
 const app = express();
+
+// CORS configuration
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true,
+}));
 
 // Middleware pour parser le JSON
 app.use(express.json());

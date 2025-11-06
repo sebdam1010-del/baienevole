@@ -35,7 +35,7 @@ async function main() {
   const volunteers = await Promise.all([
     prisma.user.create({
       data: {
-        email: 'benevolе1@example.com',
+        email: 'benevole1@example.com',
         password: volunteerPassword,
         firstName: 'Marie',
         lastName: 'Dupont',

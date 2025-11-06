@@ -9,6 +9,8 @@ const Events = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [actionLoading, setActionLoading] = useState({});
   const [filters, setFilters] = useState({
     saison: '',
     annee: '',
@@ -72,19 +74,35 @@ const Events = () => {
 
   const handleRegister = async (eventId) => {
     try {
+      setActionLoading(prev => ({ ...prev, [eventId]: true }));
+      setError('');
+      setSuccessMessage('');
       await api.post(`/events/${eventId}/register`);
-      fetchEvents(); // Refresh to show updated registration
+      setSuccessMessage('Inscription réussie !');
+      await fetchEvents(); // Refresh to show updated registration
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur lors de l\'inscription');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [eventId]: false }));
     }
   };
 
   const handleUnregister = async (eventId) => {
     try {
+      setActionLoading(prev => ({ ...prev, [eventId]: true }));
+      setError('');
+      setSuccessMessage('');
       await api.delete(`/events/${eventId}/register`);
-      fetchEvents(); // Refresh to show updated registration
+      setSuccessMessage('Désinscription réussie !');
+      await fetchEvents(); // Refresh to show updated registration
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur lors de la désinscription');
+    } finally {
+      setActionLoading(prev => ({ ...prev, [eventId]: false }));
     }
   };
 
@@ -119,6 +137,19 @@ const Events = () => {
           }}
         >
           {error}
+        </div>
+      )}
+
+      {successMessage && (
+        <div
+          className="p-3 rounded border text-sm"
+          style={{
+            backgroundColor: '#D1FAE5',
+            borderColor: 'var(--color-baie-green)',
+            color: '#065F46',
+          }}
+        >
+          {successMessage}
         </div>
       )}
 
@@ -226,8 +257,9 @@ const Events = () => {
                         size="sm"
                         onClick={() => handleUnregister(event.id)}
                         className="flex-1"
+                        disabled={actionLoading[event.id]}
                       >
-                        Se désinscrire
+                        {actionLoading[event.id] ? 'Désinscription...' : 'Se désinscrire'}
                       </Button>
                     ) : (
                       <Button
@@ -235,8 +267,9 @@ const Events = () => {
                         size="sm"
                         onClick={() => handleRegister(event.id)}
                         className="flex-1"
+                        disabled={actionLoading[event.id]}
                       >
-                        S'inscrire
+                        {actionLoading[event.id] ? 'Inscription...' : 'S\'inscrire'}
                       </Button>
                     )}
                     <Link to={`/events/${event.id}`} className="flex-1">
