@@ -21,6 +21,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Routes API
+const authRoutes = require('./routes/authRoutes');
+app.use('/api/auth', authRoutes);
+
 // Gestion des routes non trouvées
 app.use((req, res) => {
   res.status(404).json({
