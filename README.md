@@ -162,6 +162,12 @@ npm run db:studio          # Ouvrir Prisma Studio (interface graphique)
 # Notifications email
 npm run reminders:send     # Envoyer les rappels d'événements (24h avant)
 
+# Tests E2E (Playwright)
+npm run test:e2e           # Lancer les tests E2E
+npm run test:e2e:ui        # Lancer avec l'interface UI de Playwright
+npm run test:e2e:headed    # Lancer avec navigateur visible
+npm run test:e2e:report    # Afficher le rapport des derniers tests
+
 # Lancer le serveur en production
 npm start
 ```

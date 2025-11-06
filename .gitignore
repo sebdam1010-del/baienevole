@@ -10,6 +10,9 @@ package-lock.json
 # Testing
 coverage/
 *.log
+test-results/
+playwright-report/
+playwright/.cache/
 
 # Build
 dist/

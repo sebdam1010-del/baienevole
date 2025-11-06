@@ -16,7 +16,11 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "node prisma/seed.js",
     "db:studio": "prisma studio",
-    "reminders:send": "node scripts/sendReminders.js"
+    "reminders:send": "node scripts/sendReminders.js",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report"
   },
   "keywords": [
     "volunteer",
@@ -38,6 +42,7 @@
     "nodemailer": "^7.0.10"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "jest": "^30.2.0",
