@@ -211,6 +211,69 @@ Les icônes PWA sont dans `client/public/icons/`. Pour personnaliser:
 
 ```
 
+## 📚 Documentation API
+
+L'API REST est entièrement documentée avec **Swagger/OpenAPI 3.0**.
+
+### Accès à la documentation interactive
+
+Une fois le serveur lancé, accédez à la documentation Swagger UI :
+
+**🔗 http://localhost:3000/api-docs**
+
+La documentation interactive permet de :
+- 📖 Consulter tous les endpoints disponibles
+- 🔍 Voir les schémas de données (User, Event, Registration)
+- 🧪 Tester les endpoints directement depuis l'interface
+- 🔐 S'authentifier avec un token JWT Bearer
+- 📝 Voir les exemples de requêtes et réponses
+
+### Organisation des endpoints
+
+Les endpoints sont organisés par catégories :
+
+**Authentication** (`/api/auth`)
+- `POST /api/auth/register` - Créer un compte
+- `POST /api/auth/login` - Se connecter
+- `GET /api/auth/me` - Obtenir son profil
+
+**Events** (`/api/events`)
+- `GET /api/events` - Liste des événements (avec filtres saison/année)
+- `GET /api/events/:id` - Détails d'un événement
+- `GET /api/events/export/csv` - Exporter en CSV
+- `POST /api/events/:id/register` - S'inscrire à un événement
+- `DELETE /api/events/:id/register` - Se désinscrire
+
+**Admin** (`/api/admin`)
+- `POST /api/events` - Créer un événement
+- `POST /api/events/import` - Importer des événements (CSV)
+- `PUT /api/events/:id` - Modifier un événement
+- `DELETE /api/events/:id` - Supprimer un événement
+- `GET /api/admin/events` - Liste avec détails d'inscription
+- `GET /api/admin/events/:id/export` - Exporter inscriptions en CSV
+- `DELETE /api/admin/registrations/:id` - Supprimer une inscription
+
+**Profile** (`/api/profile`)
+- `GET /api/profile` - Obtenir son profil
+- `PUT /api/profile` - Mettre à jour son profil
+
+**Dashboard** (`/api/dashboard`)
+- `GET /api/dashboard/my-events` - Mes événements
+- `GET /api/dashboard/upcoming` - Mes événements à venir
+- `GET /api/dashboard/history` - Mon historique
+- `GET /api/dashboard/stats` - Mes statistiques
+
+**Volunteers** (`/api/volunteers`)
+- `GET /api/volunteers` - Liste des bénévoles (admin)
+
+### Authentification
+
+L'API utilise des **tokens JWT Bearer**. Pour les endpoints protégés :
+
+1. Obtenez un token via `/api/auth/login` ou `/api/auth/register`
+2. Ajoutez le header : `Authorization: Bearer <votre-token>`
+3. Dans Swagger UI, cliquez sur "Authorize" et entrez le token
+
 ## 📧 Système de notifications email
 
 Le système envoie automatiquement des emails dans les cas suivants:
