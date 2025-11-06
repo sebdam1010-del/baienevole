@@ -42,6 +42,9 @@ model Event {
   nombreBenevolesRequis       Int
   saison                       Int
   commentaires                 String?
+  imageUrl                     String?             // URL de l'image de l'événement
+  tarif                        String?             // Tarif de l'événement
+  urlSite                      String?             // URL de la page sur le site officiel
   createdAt                    DateTime            @default(now())
   updatedAt                    DateTime            @updatedAt
   registrations                EventRegistration[]

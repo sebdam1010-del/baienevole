@@ -17,6 +17,7 @@
     "db:seed": "node prisma/seed.js",
     "db:studio": "prisma studio",
     "reminders:send": "node scripts/sendReminders.js",
+    "scrape:events": "node scripts/scrapeEvents.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
@@ -32,6 +33,7 @@
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^6.19.0",
+    "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "csv-parse": "^6.1.0",
@@ -40,6 +42,7 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.10",
+    "puppeteer": "^24.29.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },

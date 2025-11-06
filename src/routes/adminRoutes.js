@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth, isAdmin } = require('../middleware/auth');
 const eventsController = require('../controllers/eventsController');
+const scrapeController = require('../controllers/scrapeController');
 
 /**
  * @swagger
@@ -127,5 +128,84 @@ router.get('/events/:id/export', requireAuth, isAdmin, eventsController.exportEv
  *         description: Accès refusé (admin requis)
  */
 router.delete('/registrations/:id', requireAuth, isAdmin, eventsController.deleteRegistration);
+
+/**
+ * @swagger
+ * /api/admin/scrape/events:
+ *   post:
+ *     summary: Scraper et importer les événements du site officiel
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Scraping terminé avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 stats:
+ *                   type: object
+ *                   properties:
+ *                     found:
+ *                       type: integer
+ *                       description: Nombre d'événements trouvés
+ *                     created:
+ *                       type: integer
+ *                       description: Nombre d'événements créés
+ *                     updated:
+ *                       type: integer
+ *                       description: Nombre d'événements mis à jour
+ *                     errors:
+ *                       type: integer
+ *                       description: Nombre d'erreurs
+ *       403:
+ *         description: Accès refusé (admin requis)
+ *       500:
+ *         description: Erreur lors du scraping
+ */
+router.post('/scrape/events', requireAuth, isAdmin, scrapeController.scrapeAndImportEvents);
+
+/**
+ * @swagger
+ * /api/admin/scrape/status:
+ *   get:
+ *     summary: Obtenir le statut du dernier scraping
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Statut du scraping
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 stats:
+ *                   type: object
+ *                   properties:
+ *                     totalImported:
+ *                       type: integer
+ *                       description: Nombre total d'événements importés
+ *                     lastImported:
+ *                       type: object
+ *                       properties:
+ *                         name:
+ *                           type: string
+ *                         date:
+ *                           type: string
+ *                           format: date-time
+ *       403:
+ *         description: Accès refusé (admin requis)
+ */
+router.get('/scrape/status', requireAuth, isAdmin, scrapeController.getScrapeStatus);
 
 module.exports = router;

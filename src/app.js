@@ -15,6 +15,9 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Servir les fichiers statiques (images d'événements)
+app.use('/images', express.static('public/images'));
+
 // Route de bienvenue
 app.get('/', (req, res) => {
   res.json({
