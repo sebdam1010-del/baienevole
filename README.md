@@ -159,8 +159,59 @@ npm run db:migrate         # Créer une migration
 npm run db:seed            # Peupler la DB avec des données
 npm run db:studio          # Ouvrir Prisma Studio (interface graphique)
 
+# Notifications email
+npm run reminders:send     # Envoyer les rappels d'événements (24h avant)
+
 # Lancer le serveur en production
 npm start
+```
+
+## 📧 Système de notifications email
+
+Le système envoie automatiquement des emails dans les cas suivants:
+
+### 1. Confirmation d'inscription
+Envoyé immédiatement après qu'un bénévole s'inscrit à un événement.
+- Contient les détails de l'événement
+- Confirme l'inscription
+- Rappelle qu'un rappel sera envoyé 24h avant
+
+### 2. Alerte de désinscription (admins uniquement)
+Envoyé aux administrateurs quand un bénévole se désinscrit.
+- Nom et email du bénévole
+- Détails de l'événement
+- Nombre de bénévoles restants vs requis
+
+### 3. Rappels automatiques 24h avant l'événement
+Envoyés quotidiennement via un script cron.
+
+**Configuration du cron job (Linux/Mac):**
+```bash
+# Éditer la crontab
+crontab -e
+
+# Ajouter cette ligne pour exécuter tous les jours à 10h00
+0 10 * * * cd /chemin/vers/baienevole && npm run reminders:send >> logs/reminders.log 2>&1
+```
+
+**Test manuel:**
+```bash
+npm run reminders:send
+```
+
+### Configuration SMTP
+Créer un fichier `.env` avec vos identifiants SMTP:
+```env
+# Production
+NODE_ENV=production
+SMTP_HOST=smtp.votre-serveur.com
+SMTP_PORT=587
+SMTP_USER=votre-email@example.com
+SMTP_PASS=votre-mot-de-passe
+SMTP_FROM="La Baie des Singes <noreply@baiedessinges.com>"
+
+# Développement (utilise Ethereal Email pour tests)
+NODE_ENV=development
 ```
 
 ## Structure du projet

@@ -1,5 +1,6 @@
 const db = require('../utils/db');
 const { parse } = require('csv-parse/sync');
+const emailService = require('../services/emailService');
 
 // Helper to calculate quota status
 const calculateQuotaStatus = (registered, required) => {
@@ -593,6 +594,25 @@ exports.registerForEvent = async (req, res) => {
       },
     });
 
+    // Send confirmation email to volunteer (don't await - fire and forget)
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (user) {
+      emailService.sendRegistrationConfirmation(
+        {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+        },
+        {
+          nom: event.nom,
+          description: event.description,
+          date: event.date,
+          horaireArrivee: event.horaireArrivee,
+          horaireDepart: event.horaireDepart,
+        }
+      ).catch(err => console.error('Email sending failed:', err));
+    }
+
     const response = {
       message: 'Successfully registered for event',
       registration,
@@ -643,12 +663,43 @@ exports.unregisterFromEvent = async (req, res) => {
       });
     }
 
+    // Get user info before deleting
+    const user = await db.user.findUnique({ where: { id: userId } });
+
+    // Get remaining registrations count (before deletion)
+    const registrationsCount = await db.eventRegistration.count({
+      where: { eventId: id },
+    });
+
     // Delete registration
     await db.eventRegistration.delete({
       where: {
         id: registration.id,
       },
     });
+
+    // Send alert to all admins (don't await - fire and forget)
+    if (user) {
+      const adminEmails = await emailService.getAdminEmails();
+      if (adminEmails.length > 0) {
+        emailService.sendUnregistrationAlert(
+          {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+          },
+          {
+            nom: event.nom,
+            date: event.date,
+            horaireArrivee: event.horaireArrivee,
+            horaireDepart: event.horaireDepart,
+            nombreBenevolesRequis: event.nombreBenevolesRequis,
+            registrationsCount: registrationsCount - 1, // -1 because we just deleted
+          },
+          adminEmails
+        ).catch(err => console.error('Email sending failed:', err));
+      }
+    }
 
     res.status(200).json({
       message: 'Successfully unregistered from event',

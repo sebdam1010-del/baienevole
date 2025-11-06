@@ -15,7 +15,8 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "node prisma/seed.js",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "reminders:send": "node scripts/sendReminders.js"
   },
   "keywords": [
     "volunteer",
@@ -33,7 +34,8 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "nodemailer": "^7.0.10"
   },
   "devDependencies": {
     "eslint": "^9.39.1",
