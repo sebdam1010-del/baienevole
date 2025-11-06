@@ -25,10 +25,14 @@ app.get('/api/health', (req, res) => {
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const eventsRoutes = require('./routes/eventsRoutes');
+const profileRoutes = require('./routes/profileRoutes');
+const volunteersRoutes = require('./routes/volunteersRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/events', eventsRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/volunteers', volunteersRoutes);
 
 // Gestion des routes non trouvées
 app.use((req, res) => {
