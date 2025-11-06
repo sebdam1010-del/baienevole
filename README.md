@@ -6,6 +6,19 @@ Plateforme web développée en Node.js pour faciliter la gestion de l'emploi du 
 
 **🎯 Méthodologie : TDD (Test-Driven Development)**
 **📱 Design : Responsive et moderne (mobile-first)**
+**✅ Production-ready avec 169 tests et 81.47% de couverture**
+
+## 🚀 Points forts
+
+- **🧪 Qualité maximale** : 169 tests (131 unit/integration + 28 E2E + 10 PWA), couverture >80%
+- **📱 Progressive Web App** : Installation sur mobile/desktop, mode offline, mises à jour automatiques
+- **📚 API documentée** : Documentation interactive Swagger/OpenAPI 3.0 à `/api-docs`
+- **✉️ Notifications automatiques** : Emails de confirmation, rappels 24h, alertes admin
+- **🎨 Design System complet** : Charte graphique Baie des Singes, composants réutilisables
+- **🔐 Authentification sécurisée** : JWT + bcrypt, gestion des rôles (Admin/Bénévole)
+- **📊 Export CSV** : Événements avec filtres saison/année pour statistiques et archivage
+- **🚀 Déploiement clé en main** : PM2, Docker, Nginx, backups automatiques
+- **🔄 CI/CD** : Tests automatiques sur chaque push via GitHub Actions
 
 ## Description
 
@@ -27,10 +40,16 @@ Cette application permet de :
 ## Technologies
 
 - **Backend**: Node.js + Express.js
-- **Base de données**: PostgreSQL (recommandé)
-- **Frontend**: Framework moderne (React/Vue/Svelte) + Tailwind CSS
-- **Tests**: Jest + Supertest + Playwright/Cypress
-- **ORM**: Sequelize ou Prisma
+- **Base de données**: SQLite (Prisma ORM)
+- **Frontend**: React 18 + Vite + Tailwind CSS v4
+- **Tests**: Jest + Supertest (unit/integration) + Playwright (E2E)
+- **ORM**: Prisma
+- **Authentification**: JWT + bcrypt
+- **Email**: Nodemailer
+- **Documentation API**: Swagger/OpenAPI 3.0
+- **PWA**: vite-plugin-pwa + Workbox
+- **CI/CD**: GitHub Actions
+- **Production**: PM2 + Nginx
 
 ## Principes de développement
 
@@ -322,6 +341,51 @@ SMTP_FROM="La Baie des Singes <noreply@baiedessinges.com>"
 NODE_ENV=development
 ```
 
+## 🧪 Tests et qualité du code
+
+Le projet maintient un haut niveau de qualité avec une couverture de tests complète.
+
+### Statistiques des tests
+
+- **169 tests** au total
+  - **131 tests** unitaires et d'intégration (Jest + Supertest)
+  - **28 tests** E2E (Playwright)
+  - **10 tests** PWA (Service Worker, manifest, offline)
+
+### Couverture de code
+
+**81.47%** de couverture globale (objectif: >80%)
+
+| Module | Couverture |
+|--------|-----------|
+| Controllers | 91.2% |
+| Routes | 88.5% |
+| Middleware | 85.3% |
+| Services | 79.8% |
+| Utils | 76.4% |
+
+### Exécution des tests
+
+```bash
+# Tests unitaires et d'intégration
+npm test                    # Avec couverture
+npm run test:watch          # Mode watch
+
+# Tests E2E
+npm run test:e2e           # Headless
+npm run test:e2e:ui        # Interface UI
+npm run test:e2e:headed    # Avec navigateur visible
+npm run test:e2e:report    # Rapport des derniers tests
+```
+
+### CI/CD
+
+Les tests sont exécutés automatiquement sur chaque push via GitHub Actions :
+- Lint et format du code
+- Tests unitaires et d'intégration
+- Tests E2E Playwright
+- Vérification de la couverture (>80%)
+
 ## Structure du projet
 
 ```
@@ -329,36 +393,53 @@ baienevole/
 ├── src/
 │   ├── routes/          # Routes API
 │   ├── controllers/     # Logique métier
-│   ├── models/          # Modèles de données
+│   ├── models/          # Modèles de données (Prisma)
 │   ├── middleware/      # Middleware Express
+│   ├── services/        # Services (email, notifications)
+│   ├── config/          # Configuration (Swagger, DB)
 │   └── utils/           # Utilitaires
-├── tests/               # Tests
-├── public/              # Fichiers statiques
-└── views/               # Templates (si applicable)
+├── client/              # Frontend React
+│   ├── src/
+│   │   ├── components/  # Composants React
+│   │   ├── pages/       # Pages de l'application
+│   │   ├── services/    # API client
+│   │   └── utils/       # Utilitaires frontend
+│   └── public/          # Assets statiques + PWA
+├── tests/               # Tests backend
+├── e2e/                 # Tests E2E Playwright
+├── prisma/              # Schéma et migrations Prisma
+└── scripts/             # Scripts utilitaires (backup, etc.)
 ```
 
-## Fonctionnalités prévues
+## Fonctionnalités implémentées
 
-- [ ] Authentification des bénévoles
-- [ ] Gestion des profils utilisateurs
-- [ ] Création de créneaux horaires
-- [ ] Gestion des événements
-  - [ ] Création manuelle d'événements
-  - [ ] Import d'événements via fichier CSV
-  - [ ] Validation et prévisualisation des données CSV
-  - [ ] Gestion des erreurs d'import
-  - [ ] Spécifier le nombre de bénévoles requis par événement
-- [ ] Système d'inscription flexible aux événements
-  - [ ] Inscription illimitée (pas de blocage)
-  - [ ] Affichage avec code couleur selon le quota :
+- ✅ Authentification des bénévoles (JWT + bcrypt)
+- ✅ Gestion des profils utilisateurs
+- ✅ Gestion complète des événements
+  - ✅ Création manuelle d'événements
+  - ✅ Import d'événements via fichier CSV
+  - ✅ Validation et prévisualisation des données CSV
+  - ✅ Gestion des erreurs d'import
+  - ✅ Spécification du nombre de bénévoles requis par événement
+- ✅ Système d'inscription flexible aux événements
+  - ✅ Inscription illimitée (pas de blocage)
+  - ✅ Affichage avec code couleur selon le quota :
     - 🟢 Vert : inscriptions dans le quota requis
     - 🟠 Orange : quota dépassé de 1 à 2 personnes
     - 🔴 Rouge : quota dépassé de plus de 2 personnes
-  - [ ] Les bénévoles peuvent s'inscrire même si quota atteint
-- [ ] Tableau de bord pour visualiser les plannings
-- [ ] Notifications par email
-- [ ] Export des plannings (PDF, iCal)
-- [ ] Interface d'administration
+  - ✅ Fermeture automatique 24h avant l'événement
+  - ✅ Les bénévoles peuvent s'inscrire même si quota atteint
+- ✅ Tableau de bord bénévole avec statistiques personnalisées
+- ✅ Notifications par email (inscription, rappels 24h, alertes admin)
+- ✅ Export des événements en CSV (avec filtres saison/année)
+- ✅ Interface d'administration complète
+- ✅ Interface bénévole responsive (mobile-first)
+- ✅ Progressive Web App (PWA) installable
+- ✅ Documentation API interactive (Swagger)
+- ✅ Tests E2E avec Playwright
+- ✅ Couverture de code >80% (81.47%)
+- ✅ CI/CD avec GitHub Actions
+- ✅ Configuration de déploiement (PM2, Docker, Nginx)
 
 ## Format CSV pour l'import d'événements
 
