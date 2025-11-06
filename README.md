@@ -437,7 +437,40 @@ Le fichier [ISSUES.md](./ISSUES.md) contient le détail de toutes les 25 issues 
 
 ## Contribution
 
-Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou une pull request.
+Les contributions sont les bienvenues ! Ce projet suit une méthodologie TDD stricte.
+
+**👉 Consultez le [Guide de contribution](./CONTRIBUTING.md) pour :**
+- Installation et configuration du projet
+- Workflow Git et conventions de commit
+- Méthodologie TDD (Test-Driven Development)
+- Conventions de code et linting
+- Processus de Pull Request
+- Architecture du projet
+
+### Contribution rapide
+
+```bash
+# 1. Fork et clone
+git clone https://github.com/VOTRE-USERNAME/baienevole.git
+
+# 2. Installez les dépendances
+npm install && cd client && npm install
+
+# 3. Créez une branche
+git checkout -b feature/ma-fonctionnalite
+
+# 4. Développez avec TDD (tests d'abord !)
+npm test
+
+# 5. Ouvrez une Pull Request
+```
+
+**Règles essentielles :**
+- ✅ Tests **AVANT** le code (TDD)
+- ✅ Couverture >= 80%
+- ✅ Tous les tests passent
+- ✅ Code linté et formaté
+- ✅ Documentation à jour
 
 ## Licence
 
