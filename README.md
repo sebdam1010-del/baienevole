@@ -472,6 +472,34 @@ npm test
 - ✅ Code linté et formaté
 - ✅ Documentation à jour
 
+## Déploiement
+
+Pour déployer l'application en production, consultez le [Guide de déploiement](./DEPLOYMENT.md).
+
+### Options de déploiement
+
+- **VPS** : Déploiement traditionnel sur serveur Linux (Ubuntu recommandé)
+- **Docker** : Déploiement conteneurisé avec Docker Compose
+- **Cloud** : Compatible avec la plupart des plateformes cloud
+
+### Configuration minimale
+
+- Node.js 18+
+- 1GB RAM (2GB recommandé)
+- 5GB d'espace disque
+- Certificat SSL (Let's Encrypt)
+
+### Documentation complète
+
+Le [Guide de déploiement](./DEPLOYMENT.md) couvre :
+- Installation sur VPS (Ubuntu)
+- Configuration Nginx + SSL
+- Gestion avec PM2
+- Docker et docker-compose
+- Sécurité et monitoring
+- Sauvegarde automatique
+- Dépannage
+
 ## Licence
 
 À définir
