@@ -132,3 +132,18 @@ exports.login = async (req, res) => {
     });
   }
 };
+
+// Get current user
+exports.getMe = async (req, res) => {
+  try {
+    // User is already attached by requireAuth middleware
+    res.status(200).json({
+      user: req.user,
+    });
+  } catch (error) {
+    console.error('GetMe error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+};
