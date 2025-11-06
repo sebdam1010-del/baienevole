@@ -210,7 +210,80 @@ async function scrapeEventsFromPage(page) {
 }
 
 /**
- * Scrape toutes les pages d'événements avec pagination
+ * Scrape une liste de pages avec pagination (événements à venir ou passés)
+ * @param {Object} page - Page Puppeteer
+ * @param {string} eventDisplay - 'upcoming' ou 'past'
+ * @returns {Array} Liste des événements scrapés
+ */
+async function scrapePaginatedEvents(page, eventDisplay = 'upcoming') {
+  const displayLabel = eventDisplay === 'past' ? 'passés' : 'à venir';
+  log.info(`\n📅 Scraping des événements ${displayLabel}...`);
+
+  let allEvents = [];
+  let pageNumber = 1;
+  let hasMorePages = true;
+
+  while (hasMorePages) {
+    // Construire l'URL selon le type d'événements
+    let url;
+    if (eventDisplay === 'past') {
+      url = pageNumber === 1
+        ? `${SITE_URL}?eventDisplay=past`
+        : `${SITE_URL}page/${pageNumber}/?eventDisplay=past`;
+    } else {
+      url = pageNumber === 1
+        ? SITE_URL
+        : `${SITE_URL}page/${pageNumber}/`;
+    }
+
+    log.info(`📄 Page ${pageNumber} (${displayLabel}): ${url}`);
+
+    try {
+      const response = await page.goto(url, {
+        waitUntil: 'networkidle2',
+        timeout: 30000,
+      });
+
+      // Vérifier si la page existe (pas de 404)
+      if (response.status() === 404) {
+        log.warning(`Page ${pageNumber} inexistante (404), arrêt de la pagination`);
+        hasMorePages = false;
+        break;
+      }
+
+      const pageEvents = await scrapeEventsFromPage(page);
+
+      log.success(`${pageEvents.length} événement(s) trouvé(s) sur la page ${pageNumber}`);
+
+      if (pageEvents.length === 0) {
+        log.warning(`Aucun événement sur la page ${pageNumber}, arrêt de la pagination`);
+        hasMorePages = false;
+        break;
+      }
+
+      // Ajouter les événements à la liste totale
+      allEvents = allEvents.concat(pageEvents);
+      pageNumber++;
+
+      // Pause de 1s entre chaque page pour ne pas surcharger le serveur
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+    } catch (error) {
+      if (error.message.includes('404') || error.message.includes('net::ERR_ABORTED')) {
+        log.warning(`Page ${pageNumber} non accessible, arrêt de la pagination`);
+        hasMorePages = false;
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  log.success(`✓ ${allEvents.length} événement(s) ${displayLabel} trouvé(s) sur ${pageNumber - 1} page(s)`);
+  return allEvents;
+}
+
+/**
+ * Scrape toutes les pages d'événements avec pagination (à venir + passés)
  */
 async function scrapeEvents() {
   log.info('Démarrage du scraping avec pagination...');
@@ -226,59 +299,16 @@ async function scrapeEvents() {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     );
 
-    let allEvents = [];
-    let pageNumber = 1;
-    let hasMorePages = true;
+    // Scraper les événements à venir
+    const upcomingEvents = await scrapePaginatedEvents(page, 'upcoming');
 
-    while (hasMorePages) {
-      const url = pageNumber === 1
-        ? SITE_URL
-        : `${SITE_URL}page/${pageNumber}/`;
+    // Scraper les événements passés
+    const pastEvents = await scrapePaginatedEvents(page, 'past');
 
-      log.info(`📄 Page ${pageNumber}: Navigation vers ${url}...`);
+    // Fusionner tous les événements
+    const allEvents = [...upcomingEvents, ...pastEvents];
 
-      try {
-        const response = await page.goto(url, {
-          waitUntil: 'networkidle2',
-          timeout: 30000,
-        });
-
-        // Vérifier si la page existe (pas de 404)
-        if (response.status() === 404) {
-          log.warning(`Page ${pageNumber} inexistante (404), arrêt de la pagination`);
-          hasMorePages = false;
-          break;
-        }
-
-        log.info(`Extraction des événements de la page ${pageNumber}...`);
-        const pageEvents = await scrapeEventsFromPage(page);
-
-        log.success(`${pageEvents.length} événement(s) trouvé(s) sur la page ${pageNumber}`);
-
-        if (pageEvents.length === 0) {
-          log.warning(`Aucun événement sur la page ${pageNumber}, arrêt de la pagination`);
-          hasMorePages = false;
-          break;
-        }
-
-        // Ajouter les événements à la liste totale
-        allEvents = allEvents.concat(pageEvents);
-        pageNumber++;
-
-        // Pause de 1s entre chaque page pour ne pas surcharger le serveur
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-      } catch (error) {
-        if (error.message.includes('404') || error.message.includes('net::ERR_ABORTED')) {
-          log.warning(`Page ${pageNumber} non accessible, arrêt de la pagination`);
-          hasMorePages = false;
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    log.success(`🎉 Total: ${allEvents.length} événement(s) trouvé(s) sur ${pageNumber - 1} page(s)`);
+    log.success(`\n🎉 Total général: ${allEvents.length} événement(s) (${upcomingEvents.length} à venir + ${pastEvents.length} passés)`);
 
     if (allEvents.length === 0) {
       log.warning('Aucun événement trouvé. Vérifiez les sélecteurs CSS.');
