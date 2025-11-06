@@ -759,3 +759,153 @@ exports.exportEventsCSV = async (req, res) => {
     });
   }
 };
+
+// ADMIN - GET /api/admin/events (with full registration data)
+exports.getAdminEvents = async (req, res) => {
+  try {
+    const { saison, annee } = req.query;
+    const where = {};
+
+    if (saison) {
+      where.saison = parseInt(saison);
+    }
+
+    if (annee) {
+      const year = parseInt(annee);
+      where.date = {
+        gte: new Date(`${year}-01-01`),
+        lte: new Date(`${year}-12-31`),
+      };
+    }
+
+    const events = await db.event.findMany({
+      where,
+      orderBy: {
+        date: 'asc',
+      },
+      include: {
+        registrations: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
+
+    res.status(200).json(events);
+  } catch (error) {
+    console.error('Get admin events error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+};
+
+// ADMIN - GET /api/admin/events/:id/export (export single event registrations)
+exports.exportEventRegistrations = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const event = await db.event.findUnique({
+      where: { id },
+      include: {
+        registrations: {
+          include: {
+            user: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      return res.status(404).json({
+        error: 'Event not found',
+      });
+    }
+
+    // Create CSV header with UTF-8 BOM
+    const BOM = '\uFEFF';
+    const header = 'Prénom,Nom,Email,Téléphone,Date inscription';
+
+    // Create CSV rows
+    const rows = event.registrations.map((reg) => {
+      const escapeCSV = (field) => {
+        if (field === null || field === undefined) return '';
+        const str = String(field);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      return [
+        escapeCSV(reg.user.firstName),
+        escapeCSV(reg.user.lastName),
+        escapeCSV(reg.user.email),
+        escapeCSV(reg.user.phone),
+        new Date(reg.createdAt).toLocaleString('fr-FR'),
+      ].join(',');
+    });
+
+    // Combine header and rows
+    const csv = BOM + [header, ...rows].join('\n');
+
+    // Set response headers
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="event-${event.nom.replace(/[^a-z0-9]/gi, '_')}-${new Date().toISOString().split('T')[0]}.csv"`
+    );
+
+    res.status(200).send(csv);
+  } catch (error) {
+    console.error('Export event registrations error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+};
+
+// ADMIN - DELETE /api/admin/registrations/:id
+exports.deleteRegistration = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const registration = await db.eventRegistration.findUnique({
+      where: { id },
+    });
+
+    if (!registration) {
+      return res.status(404).json({
+        error: 'Registration not found',
+      });
+    }
+
+    await db.eventRegistration.delete({
+      where: { id },
+    });
+
+    res.status(200).json({
+      message: 'Registration deleted successfully',
+    });
+  } catch (error) {
+    console.error('Delete registration error:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+    });
+  }
+};
