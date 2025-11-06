@@ -17,6 +17,7 @@ playwright/.cache/
 # Build
 dist/
 build/
+dev-dist/
 
 # IDE
 .vscode/

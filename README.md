@@ -172,6 +172,45 @@ npm run test:e2e:report    # Afficher le rapport des derniers tests
 npm start
 ```
 
+## 📱 Progressive Web App (PWA)
+
+L'application est une PWA installable offrant:
+- **Installation sur mobile/desktop**: Ajoutez l'app à l'écran d'accueil
+- **Mode offline**: Cache intelligent pour accès sans connexion
+- **Mises à jour automatiques**: Service worker avec auto-update
+- **Expérience native**: Interface standalone sans navigateur
+
+### Fonctionnalités PWA
+
+**Cache Strategy:**
+- Assets statiques (JS, CSS, fonts): Cache-first
+- API calls: Network-first avec fallback cache (5 min)
+- Google Fonts: Cache-first (1 an)
+
+**Raccourcis:**
+- Événements: Accès direct à la liste des événements
+- Dashboard: Accès direct au tableau de bord
+
+### Installation
+
+**Sur mobile (Android/iOS):**
+1. Ouvrez l'app dans le navigateur
+2. Appuyez sur "Ajouter à l'écran d'accueil"
+3. Suivez les instructions
+
+**Sur desktop (Chrome/Edge):**
+1. Cliquez sur l'icône d'installation dans la barre d'adresse
+2. Confirmez l'installation
+
+### Configuration
+
+Les icônes PWA sont dans `client/public/icons/`. Pour personnaliser:
+1. Remplacez `icon.svg` par votre logo
+2. Générez les PNG: `node client/scripts/generateIcons.cjs`
+3. Rebuild l'app: `cd client && npm run build`
+
+```
+
 ## 📧 Système de notifications email
 
 Le système envoie automatiquement des emails dans les cas suivants:
