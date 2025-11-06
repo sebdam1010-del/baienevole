@@ -150,43 +150,78 @@ async function scrapeEvents() {
 
     log.info('Extraction des événements...');
 
-    // Extraire les événements
+    // Extraire les événements depuis le JSON-LD (The Events Calendar)
     const events = await page.evaluate(() => {
       const eventsList = [];
 
-      // Sélectionner tous les événements
-      // NOTE: À adapter selon la structure HTML réelle du site
-      const eventElements = document.querySelectorAll('.event-item, .programme-item, article.event, .spectacle-item');
+      // Chercher tous les scripts JSON-LD contenant des événements
+      const scripts = document.querySelectorAll('script[type="application/ld+json"]');
 
-      eventElements.forEach((el) => {
+      scripts.forEach((script) => {
         try {
-          // Récupérer les informations (à adapter selon le HTML)
-          const titleEl = el.querySelector('h2, h3, .title, .event-title, .spectacle-titre');
-          const imageEl = el.querySelector('img');
-          const linkEl = el.querySelector('a[href*="/spectacle/"], a[href*="/programme/"]');
-          const dateEl = el.querySelector('.date, .event-date, time, .spectacle-date');
-          const priceEl = el.querySelector('.price, .tarif, .prix, .event-price');
-          const descriptionEl = el.querySelector('.description, .excerpt, .event-description, p');
+          const data = JSON.parse(script.textContent);
 
-          if (!titleEl) return;
+          // Le site peut avoir un seul objet Event ou un array
+          const eventsArray = Array.isArray(data) ? data : [data];
 
-          const event = {
-            nom: titleEl.textContent.trim(),
-            imageUrl: imageEl ? (imageEl.src || imageEl.dataset.src) : null,
-            urlSite: linkEl ? linkEl.href : null,
-            date: dateEl ? dateEl.textContent.trim() : null,
-            tarif: priceEl ? priceEl.textContent.trim() : 'Non spécifié',
-            description: descriptionEl ? descriptionEl.textContent.trim().substring(0, 500) : null,
-          };
+          eventsArray.forEach((item) => {
+            // Vérifier si c'est un événement
+            if (item['@type'] === 'Event') {
+              const event = {
+                nom: item.name || '',
+                imageUrl: item.image || null,
+                urlSite: item.url || null,
+                date: item.startDate || null,
+                endDate: item.endDate || null,
+                tarif: extractPriceFromDescription(item.description || ''),
+                description: cleanDescription(item.description || ''),
+                horaire: extractTimeFromDate(item.startDate),
+                location: item.location ? item.location.name : null,
+              };
 
-          // Vérifier que l'événement a au moins un nom et une URL
-          if (event.nom && event.urlSite) {
-            eventsList.push(event);
-          }
+              if (event.nom && event.urlSite) {
+                eventsList.push(event);
+              }
+            }
+          });
         } catch (error) {
-          console.error('Erreur extraction événement:', error);
+          console.error('Erreur parsing JSON-LD:', error);
         }
       });
+
+      // Fonctions utilitaires dans le contexte du browser
+      function cleanDescription(html) {
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        return div.textContent.trim().replace(/\[…\]|\[\.\.\.\]/g, '').substring(0, 500);
+      }
+
+      function extractPriceFromDescription(text) {
+        // Chercher les tarifs (TP, TR, TA, €)
+        const priceMatch = text.match(/(TP|TR|TA|Tarif)[:\s]*\d+\s*€/gi);
+        if (priceMatch) {
+          return priceMatch.join(' / ');
+        }
+
+        const simplePrice = text.match(/\d+\s*€/);
+        if (simplePrice) {
+          return simplePrice[0];
+        }
+
+        return 'Non spécifié';
+      }
+
+      function extractTimeFromDate(isoDate) {
+        if (!isoDate) return null;
+        try {
+          const date = new Date(isoDate);
+          const hours = date.getHours().toString().padStart(2, '0');
+          const minutes = date.getMinutes().toString().padStart(2, '0');
+          return `${hours}:${minutes}`;
+        } catch (e) {
+          return null;
+        }
+      }
 
       return eventsList;
     });
@@ -256,9 +291,9 @@ async function enrichEventDetails(browser, event) {
  */
 async function convertToDbFormat(scrapedEvent) {
   try {
-    // Parser la date
+    // Parser la date ISO (format: 2025-11-07T20:33:00+01:00)
     const eventDate = scrapedEvent.date
-      ? parseFrenchDate(scrapedEvent.date)
+      ? new Date(scrapedEvent.date)
       : new Date();
 
     // Télécharger l'image si disponible
@@ -268,22 +303,32 @@ async function convertToDbFormat(scrapedEvent) {
       imageUrl = await downloadImage(scrapedEvent.imageUrl, scrapedEvent.nom);
     }
 
-    // Extraire les horaires depuis la description ou utiliser des valeurs par défaut
-    const horaireMatch = scrapedEvent.horaire?.match(/(\d{1,2})[h:](\d{2})/);
-    const horaireArrivee = horaireMatch
-      ? `${horaireMatch[1].padStart(2, '0')}:${horaireMatch[2]}`
-      : '19:00';
+    // Utiliser l'horaire extrait ou valeur par défaut
+    const horaireArrivee = scrapedEvent.horaire || '19:00';
+
+    // Calculer l'horaire de départ (3h après l'arrivée par défaut)
+    const calculateDepartTime = (arrivee) => {
+      try {
+        const [hours, minutes] = arrivee.split(':').map(Number);
+        const departHours = (hours + 3) % 24;
+        return `${departHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      } catch (e) {
+        return '23:00';
+      }
+    };
 
     return {
       date: eventDate,
       nom: scrapedEvent.nom,
       description: scrapedEvent.description || `Spectacle: ${scrapedEvent.nom}`,
       horaireArrivee,
-      horaireDepart: '23:00', // Par défaut
+      horaireDepart: calculateDepartTime(horaireArrivee),
       nombreSpectatursAttendus: 100, // Valeur par défaut
       nombreBenevolesRequis: 5, // Valeur par défaut
       saison: CURRENT_SEASON,
-      commentaires: `Importé depuis le site officiel`,
+      commentaires: scrapedEvent.location
+        ? `Importé depuis le site officiel - ${scrapedEvent.location}`
+        : `Importé depuis le site officiel`,
       imageUrl,
       tarif: scrapedEvent.tarif,
       urlSite: scrapedEvent.urlSite,
