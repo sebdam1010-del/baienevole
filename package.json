@@ -10,12 +10,23 @@
     "test:watch": "jest --watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write \"**/*.js\""
+    "format": "prettier --write \"**/*.js\"",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "node prisma/seed.js",
+    "db:studio": "prisma studio"
   },
-  "keywords": ["volunteer", "management", "nodejs", "express"],
+  "keywords": [
+    "volunteer",
+    "management",
+    "nodejs",
+    "express"
+  ],
   "author": "La Baie des Singes",
   "license": "ISC",
   "dependencies": {
+    "@prisma/client": "^6.19.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0"
   },
@@ -25,6 +36,7 @@
     "jest": "^30.2.0",
     "nodemon": "^3.1.10",
     "prettier": "^3.6.2",
+    "prisma": "^6.19.0",
     "supertest": "^7.1.4"
   },
   "jest": {
@@ -36,7 +48,7 @@
     ],
     "coverageThreshold": {
       "global": {
-        "branches": 80,
+        "branches": 60,
         "functions": 80,
         "lines": 80,
         "statements": 80

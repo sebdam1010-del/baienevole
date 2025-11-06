@@ -115,6 +115,13 @@ npm install
 # Créer un fichier .env à partir du template
 cp .env.example .env
 
+# Générer le client Prisma et créer la base de données
+npm run db:generate
+npm run db:push
+
+# (Optionnel) Peupler la base de données avec des données de test
+npm run db:seed
+
 # Lancer l'application
 npm start
 ```
@@ -142,6 +149,13 @@ npm run lint:fix
 
 # Formatter le code avec Prettier
 npm run format
+
+# Commandes de base de données
+npm run db:generate        # Générer le client Prisma
+npm run db:push            # Pousser le schéma vers la DB
+npm run db:migrate         # Créer une migration
+npm run db:seed            # Peupler la DB avec des données
+npm run db:studio          # Ouvrir Prisma Studio (interface graphique)
 
 # Lancer le serveur en production
 npm start

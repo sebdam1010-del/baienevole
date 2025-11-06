@@ -29,3 +29,10 @@ Thumbs.db
 # Temporary files
 *.tmp
 .cache/
+
+# Prisma
+/src/generated/prisma
+prisma/dev.db
+prisma/dev.db-journal
+*.db
+*.db-journal
