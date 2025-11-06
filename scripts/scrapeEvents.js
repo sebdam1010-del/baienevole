@@ -10,13 +10,13 @@ const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
 const { PrismaClient } = require('@prisma/client');
+const he = require('he');
 
 const prisma = new PrismaClient();
 
 // Configuration
 const SITE_URL = 'https://www.baiedessinges.com/programme/liste/';
 const IMAGES_DIR = path.join(__dirname, '../public/images/events');
-const CURRENT_SEASON = 30; // Saison 2024-2025
 
 // Couleurs pour les logs
 const colors = {
@@ -33,6 +33,29 @@ const log = {
   warning: (msg) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
   error: (msg) => console.log(`${colors.red}✗${colors.reset} ${msg}`),
 };
+
+/**
+ * Calcule la saison à partir de la date de l'événement
+ * La saison commence en septembre et se termine en août
+ * Par exemple: septembre 2024 à août 2025 = saison 30 (2024-2025)
+ * @param {Date} date - Date de l'événement
+ * @returns {number} Numéro de saison
+ */
+function calculateSeason(date) {
+  const year = date.getFullYear();
+  const month = date.getMonth(); // 0-11
+
+  // Si le mois est entre septembre (8) et décembre (11), la saison commence cette année
+  // Sinon (janvier à août), la saison a commencé l'année précédente
+  const seasonStartYear = month >= 8 ? year : year - 1;
+
+  // Calculer le numéro de saison (en supposant que la saison 1 était 1995-1996)
+  // Ajuster selon l'historique réel de La Baie des Singes
+  const firstSeasonYear = 1995;
+  const seasonNumber = seasonStartYear - firstSeasonYear + 1;
+
+  return seasonNumber;
+}
 
 /**
  * Crée le dossier d'images s'il n'existe pas
@@ -173,7 +196,8 @@ async function scrapeEventsFromPage(page) {
       function cleanDescription(html) {
         const div = document.createElement('div');
         div.innerHTML = html;
-        return div.textContent.trim().replace(/\[…\]|\[\.\.\.\]/g, '').substring(0, 500);
+        // Ne pas tronquer ici, on le fera après avoir visité la page détaillée
+        return div.textContent.trim().replace(/\[…\]|\[\.\.\.\]/g, '');
       }
 
       function extractPriceFromDescription(text) {
@@ -261,8 +285,18 @@ async function scrapePaginatedEvents(page, eventDisplay = 'upcoming') {
         break;
       }
 
-      // Ajouter les événements à la liste totale
-      allEvents = allEvents.concat(pageEvents);
+      // Enrichir chaque événement en visitant sa page de détail
+      log.info(`Enrichissement des événements de la page ${pageNumber}...`);
+      const enrichedPageEvents = [];
+      for (const event of pageEvents) {
+        const enrichedEvent = await enrichEventDetails(page, event);
+        enrichedPageEvents.push(enrichedEvent);
+        // Petite pause entre chaque page de détail
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Ajouter les événements enrichis à la liste totale
+      allEvents = allEvents.concat(enrichedPageEvents);
       pageNumber++;
 
       // Pause de 1s entre chaque page pour ne pas surcharger le serveur
@@ -327,11 +361,12 @@ async function scrapeEvents() {
 /**
  * Enrichit un événement en visitant sa page détaillée
  */
-async function enrichEventDetails(browser, event) {
+async function enrichEventDetails(page, event) {
   try {
     if (!event.urlSite) return event;
 
-    const page = await browser.newPage();
+    log.info(`  → Visite de la page: ${event.nom}`);
+
     await page.goto(event.urlSite, {
       waitUntil: 'networkidle2',
       timeout: 15000,
@@ -341,29 +376,50 @@ async function enrichEventDetails(browser, event) {
     const details = await page.evaluate(() => {
       const result = {};
 
-      // Horaires (à adapter selon le HTML)
-      const horaireEl = document.querySelector('.horaire, .event-time, .spectacle-horaire');
-      if (horaireEl) {
-        result.horaire = horaireEl.textContent.trim();
+      // Description complète - essayer plusieurs sélecteurs
+      // The Events Calendar utilise .tribe-events-single-event-description
+      let descEl = document.querySelector('.tribe-events-single-event-description');
+
+      // Fallback sur d'autres sélecteurs possibles
+      if (!descEl) {
+        descEl = document.querySelector('.entry-content, .event-description, .content, article .description');
       }
 
-      // Description complète
-      const descEl = document.querySelector('.content, .description-complete, .spectacle-description');
       if (descEl) {
+        // Récupérer le HTML complet pour préserver la mise en forme
+        result.descriptionHtml = descEl.innerHTML.trim();
+        // Aussi extraire le texte brut
         result.description = descEl.textContent.trim();
+      }
+
+      // Essayer d'extraire des informations supplémentaires
+      // Lieu
+      const venueEl = document.querySelector('.tribe-venue, .event-venue, [itemprop="location"]');
+      if (venueEl) {
+        result.location = venueEl.textContent.trim();
       }
 
       return result;
     });
 
-    await page.close();
-
-    return {
+    // Décoder les entités HTML dans le nom et la description
+    const enrichedEvent = {
       ...event,
+      nom: he.decode(event.nom),
       ...details,
     };
+
+    // Si on a récupéré une description, la décoder aussi
+    if (enrichedEvent.description) {
+      enrichedEvent.description = he.decode(enrichedEvent.description);
+    }
+    if (enrichedEvent.descriptionHtml) {
+      enrichedEvent.descriptionHtml = he.decode(enrichedEvent.descriptionHtml);
+    }
+
+    return enrichedEvent;
   } catch (error) {
-    log.warning(`Impossible d'enrichir "${event.nom}": ${error.message}`);
+    log.warning(`  ✗ Impossible d'enrichir "${event.nom}": ${error.message}`);
     return event;
   }
 }
@@ -399,6 +455,9 @@ async function convertToDbFormat(scrapedEvent) {
       }
     };
 
+    // Calculer la saison à partir de la date de l'événement
+    const saison = calculateSeason(eventDate);
+
     return {
       date: eventDate,
       nom: scrapedEvent.nom,
@@ -407,7 +466,7 @@ async function convertToDbFormat(scrapedEvent) {
       horaireDepart: calculateDepartTime(horaireArrivee),
       nombreSpectatursAttendus: 100, // Valeur par défaut
       nombreBenevolesRequis: 5, // Valeur par défaut
-      saison: CURRENT_SEASON,
+      saison,
       commentaires: scrapedEvent.location
         ? `Importé depuis le site officiel - ${scrapedEvent.location}`
         : `Importé depuis le site officiel`,

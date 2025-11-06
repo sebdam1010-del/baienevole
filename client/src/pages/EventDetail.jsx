@@ -140,6 +140,20 @@ const EventDetail = () => {
         </div>
       )}
 
+      {/* Event Image */}
+      {event.imageUrl && (
+        <div className="w-full h-96 bg-gray-200 rounded-lg overflow-hidden">
+          <img
+            src={event.imageUrl}
+            alt={event.nom}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.target.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+
       {/* Event Details Card */}
       <Card>
         <div className="space-y-4">
@@ -183,9 +197,11 @@ const EventDetail = () => {
           {event.description && (
             <div>
               <p className="text-gray-600 mb-2">Description</p>
-              <p className="text-sm" style={{ color: 'var(--color-baie-navy)' }}>
-                {event.description}
-              </p>
+              <div
+                className="text-sm prose prose-sm max-w-none"
+                style={{ color: 'var(--color-baie-navy)' }}
+                dangerouslySetInnerHTML={{ __html: event.description }}
+              />
             </div>
           )}
 

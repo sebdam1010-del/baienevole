@@ -15,6 +15,7 @@ const Events = () => {
     saison: '',
     annee: '',
   });
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchEvents();
@@ -113,6 +114,13 @@ const Events = () => {
     return event.registrations.map(reg => reg.user?.firstName || 'Inconnu');
   };
 
+  // Filter events by search query
+  const filteredEvents = events.filter(event => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return event.nom.toLowerCase().includes(query);
+  });
+
   return (
     <div className="space-y-6">
       <div>
@@ -155,65 +163,114 @@ const Events = () => {
 
       {/* Filters */}
       <Card>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            label="Saison"
-            name="saison"
-            value={filters.saison}
-            onChange={handleFilterChange}
-          >
-            <option value="">Toutes les saisons</option>
-            <option value="1">Saison 1</option>
-            <option value="2">Saison 2</option>
-            <option value="3">Saison 3</option>
-            <option value="4">Saison 4</option>
-          </Select>
+        <div className="space-y-4">
+          {/* Search Field */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-baie-navy)' }}>
+              Rechercher
+            </label>
+            <input
+              type="text"
+              placeholder="Rechercher un événement par titre..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2"
+              style={{
+                borderColor: '#D1D5DB',
+                focusRing: 'var(--color-baie-green)',
+              }}
+            />
+          </div>
 
-          <Select
-            label="Année"
-            name="annee"
-            value={filters.annee}
-            onChange={handleFilterChange}
-          >
-            <option value="">Toutes les années</option>
-            <option value="2024">2024</option>
-            <option value="2025">2025</option>
-            <option value="2026">2026</option>
-          </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Saison"
+              name="saison"
+              value={filters.saison}
+              onChange={handleFilterChange}
+            >
+              <option value="">Toutes les saisons</option>
+              <option value="1">Saison 1</option>
+              <option value="2">Saison 2</option>
+              <option value="3">Saison 3</option>
+              <option value="4">Saison 4</option>
+            </Select>
+
+            <Select
+              label="Année"
+              name="annee"
+              value={filters.annee}
+              onChange={handleFilterChange}
+            >
+              <option value="">Toutes les années</option>
+              <option value="2024">2024</option>
+              <option value="2025">2025</option>
+              <option value="2026">2026</option>
+            </Select>
+          </div>
         </div>
       </Card>
 
       {/* Events Grid */}
       {loading ? (
         <div className="text-center py-8">Chargement...</div>
-      ) : events.length === 0 ? (
+      ) : filteredEvents.length === 0 ? (
         <Card>
-          <p className="text-center text-gray-600">Aucun événement trouvé</p>
+          <p className="text-center text-gray-600">
+            {searchQuery ? `Aucun événement trouvé pour "${searchQuery}"` : 'Aucun événement trouvé'}
+          </p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {events.map((event) => {
+          {filteredEvents.map((event) => {
             const volunteerNames = getVolunteerNames(event);
             const quotaColor = getQuotaColor(event);
             const registered = isUserRegistered(event);
 
             return (
-              <Card key={event.id} className="relative">
-                {/* Quota Status Dot */}
-                <div
-                  className="absolute top-4 right-4 rounded-full"
-                  style={{
-                    backgroundColor: quotaColor,
-                    width: '16px',
-                    height: '16px',
-                  }}
-                  title={`Statut: ${quotaColor === '#ABD4A9' ? 'OK' : quotaColor === '#EF7856' ? 'Orange' : 'Rouge'}`}
-                />
+              <Card key={event.id} className="relative overflow-hidden p-0">
+                {/* Event Image with Lazy Loading */}
+                {event.imageUrl && (
+                  <div className="relative w-full h-48 bg-gray-200">
+                    <img
+                      src={event.imageUrl}
+                      alt={event.nom}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                    {/* Quota Status Dot on Image */}
+                    <div
+                      className="absolute top-3 right-3 rounded-full shadow-lg"
+                      style={{
+                        backgroundColor: quotaColor,
+                        width: '20px',
+                        height: '20px',
+                      }}
+                      title={`Statut: ${quotaColor === '#ABD4A9' ? 'OK' : quotaColor === '#EF7856' ? 'Orange' : 'Rouge'}`}
+                    />
+                  </div>
+                )}
 
-                <div className="space-y-3">
+                <div className="p-4 space-y-3">
+                  {/* Quota Status Dot (if no image) */}
+                  {!event.imageUrl && (
+                    <div
+                      className="absolute top-4 right-4 rounded-full"
+                      style={{
+                        backgroundColor: quotaColor,
+                        width: '16px',
+                        height: '16px',
+                      }}
+                      title={`Statut: ${quotaColor === '#ABD4A9' ? 'OK' : quotaColor === '#EF7856' ? 'Orange' : 'Rouge'}`}
+                    />
+                  )}
+
                   {/* Event Title */}
                   <h3
-                    className="text-xl pr-6"
+                    className="text-xl"
                     style={{ fontFamily: 'var(--font-family-protest)', color: 'var(--color-baie-navy)' }}
                   >
                     {event.nom}
