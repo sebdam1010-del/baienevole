@@ -6,9 +6,11 @@ const Button = ({
   disabled = false,
   onClick,
   className = '',
+  as = 'button',
   ...props
 }) => {
-  const baseStyles = 'font-semibold rounded transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2';
+  const Component = as;
+  const baseStyles = 'inline-block font-semibold rounded transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer';
 
   const variants = {
     primary: 'text-white hover:opacity-90 focus:ring-opacity-50',
@@ -38,17 +40,22 @@ const Button = ({
     }
   };
 
+  const componentProps = {
+    className: `${baseStyles} ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`,
+    style: getVariantStyles(),
+    onClick: disabled ? undefined : onClick,
+    ...props,
+  };
+
+  if (as === 'button') {
+    componentProps.type = type;
+    componentProps.disabled = disabled;
+  }
+
   return (
-    <button
-      type={type}
-      disabled={disabled}
-      onClick={onClick}
-      className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
-      style={getVariantStyles()}
-      {...props}
-    >
+    <Component {...componentProps}>
       {children}
-    </button>
+    </Component>
   );
 };
 

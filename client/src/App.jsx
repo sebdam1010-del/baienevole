@@ -5,6 +5,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Events from './pages/Events';
 import AdminEvents from './pages/admin/AdminEvents';
+import AdminImport from './pages/admin/AdminImport';
 import Profile from './pages/Profile';
 import Layout from './components/Layout';
 
@@ -57,6 +58,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute adminOnly>
               <AdminEvents />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/import"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminImport />
             </ProtectedRoute>
           }
         />
