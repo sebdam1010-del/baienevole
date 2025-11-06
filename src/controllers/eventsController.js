@@ -130,26 +130,49 @@ exports.createEvent = async (req, res) => {
 // READ ALL - GET /api/events
 exports.getAllEvents = async (req, res) => {
   try {
+    const { saison, annee } = req.query;
+    const where = {};
+
+    if (saison) {
+      where.saison = parseInt(saison);
+    }
+
+    if (annee) {
+      const year = parseInt(annee);
+      where.date = {
+        gte: new Date(`${year}-01-01`),
+        lte: new Date(`${year}-12-31`),
+      };
+    }
+
     const events = await db.event.findMany({
+      where,
       orderBy: {
         date: 'asc',
       },
       include: {
-        registrations: true,
+        registrations: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    // Add quota status to each event
+    // Add quota status to each event and include minimal registration data
     const eventsWithQuota = events.map((event) => {
       const quotaStatus = calculateQuotaStatus(
         event.registrations.length,
         event.nombreBenevolesRequis
       );
 
-      // Remove registrations from response, only keep quota status
-      const { registrations, ...eventData } = event;
       return {
-        ...eventData,
+        ...event,
         quotaStatus,
       };
     });

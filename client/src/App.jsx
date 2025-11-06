@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Events from './pages/Events';
+import EventDetail from './pages/EventDetail';
 import AdminEvents from './pages/admin/AdminEvents';
 import AdminImport from './pages/admin/AdminImport';
 import Profile from './pages/Profile';
@@ -49,6 +50,7 @@ function AppRoutes() {
         }
       >
         <Route index element={<Events />} />
+        <Route path="events/:id" element={<EventDetail />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="profile" element={<Profile />} />
 
