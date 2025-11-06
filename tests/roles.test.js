@@ -7,19 +7,30 @@ describe('Roles & Permissions', () => {
   let volunteerToken;
   let adminUser;
   let volunteerUser;
+  let adminEmail;
+  let volunteerEmail;
 
   beforeEach(async () => {
     await db.user.deleteMany();
 
-    // Create an admin user
+    // Wait a bit to ensure clean state
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Create an admin user with unique email
+    adminEmail = `roles-admin-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
     const adminResponse = await request(app)
       .post('/api/auth/register')
       .send({
-        email: 'admin@example.com',
+        email: adminEmail,
         password: 'Admin123!',
         firstName: 'Admin',
         lastName: 'User',
       });
+
+    // Ensure registration was successful
+    if (!adminResponse.body.user) {
+      throw new Error(`Admin registration failed: ${JSON.stringify(adminResponse.body)}`);
+    }
 
     adminToken = adminResponse.body.token;
     adminUser = adminResponse.body.user;
@@ -30,11 +41,15 @@ describe('Roles & Permissions', () => {
       data: { role: 'ADMIN' },
     });
 
-    // Create a volunteer user
+    // Wait a bit to ensure unique timestamps
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Create a volunteer user with unique email
+    volunteerEmail = `roles-volunteer-${Date.now()}-${Math.random().toString(36).substring(7)}@example.com`;
     const volunteerResponse = await request(app)
       .post('/api/auth/register')
       .send({
-        email: 'volunteer@example.com',
+        email: volunteerEmail,
         password: 'Volunteer123!',
         firstName: 'Volunteer',
         lastName: 'User',
@@ -68,7 +83,7 @@ describe('Roles & Permissions', () => {
       const response = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'volunteer@example.com',
+          email: volunteerEmail,
           password: 'Volunteer123!',
         });
 
@@ -85,7 +100,7 @@ describe('Roles & Permissions', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('user');
-      expect(response.body.user.email).toBe('volunteer@example.com');
+      expect(response.body.user.email).toBe(volunteerEmail);
     });
 
     it('should deny access without token', async () => {
@@ -120,7 +135,7 @@ describe('Roles & Permissions', () => {
       const loginResponse = await request(app)
         .post('/api/auth/login')
         .send({
-          email: 'admin@example.com',
+          email: adminEmail,
           password: 'Admin123!',
         });
 

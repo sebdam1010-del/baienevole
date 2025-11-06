@@ -24,9 +24,11 @@ app.get('/api/health', (req, res) => {
 // Routes API
 const authRoutes = require('./routes/authRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const eventsRoutes = require('./routes/eventsRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/events', eventsRoutes);
 
 // Gestion des routes non trouvées
 app.use((req, res) => {
