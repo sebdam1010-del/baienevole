@@ -1,13 +1,13 @@
-#!/bin/bash
-
-#############################################
-# Script de déploiement production
-# Baie des Singes - Plateforme Bénévoles
-#############################################
+#!/usr/bin/env bash
+# ============================================================
+#  Production deployment script - Baie des Singes / Bénévoles
+#  - Robust error handling
+#  - PM2 detection & startup fixed
+#  - Non-root app user (least privilege)
+#  - npm ci fallback when no lockfile
+# ============================================================
 
 set -Eeuo pipefail
-
-# -------- Error handling --------
 trap 'echo -e "\033[0;31m✗ Error on line $LINENO. Aborting.\033[0m" >&2' ERR
 
 # -------- Colors --------
@@ -16,16 +16,17 @@ GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; BLUE='\033[0;34m'; NC
 # -------- Defaults --------
 APP_NAME="${APP_NAME:-baienevole}"
 DEFAULT_APP_DIR="${DEFAULT_APP_DIR:-/var/www/baienevole}"
-REPO_URL="${REPO_URL:-https://github.com/sebdam1010-del/baienevole.git}"
+REPO_URL_DEFAULT="https://github.com/sebdam1010-del/baienevole.git"
+REPO_URL="${REPO_URL:-$REPO_URL_DEFAULT}"
 NODE_VERSION_MAJOR="${NODE_VERSION:-18}"
-NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
+NGINX_CONF=""  # défini après APP_NAME
+DOMAIN=""      # défini à la config
+APP_DIR=""     # défini à la config
+USE_SSH=false
 
-# Run user (non-root) for the Node app/PM2; fallback to the sudo caller if present
+# Run user (non-root) pour l'app/PM2 ; utilise le sudo caller s'il existe
 DEPLOY_USER="${DEPLOY_USER:-${SUDO_USER:-$(id -un)}}"
 DEPLOY_HOME="$(getent passwd "$DEPLOY_USER" | cut -d: -f6)"
-
-APP_DIR=""
-USE_SSH=false
 
 print_step()    { echo -e "\n${BLUE}==>${NC} $*"; }
 print_success() { echo -e "${GREEN}✓${NC} $*"; }
@@ -40,13 +41,12 @@ require_root() {
 }
 
 # ---------- PM2 resolution (KEY FIX) ----------
-# Finds a working pm2 binary and exports PM2 variable.
+# Trouve un binaire pm2 utilisable et exporte PM2
 resolve_pm2() {
-  # Try direct resolution
-  local bin
+  local bin=""
   bin="$(command -v pm2 || true)"
 
-  # If not found, try npm -g bin for the *current* user (root here)
+  # Essaye le npm -g bin du contexte courant (root)
   if [[ -z "${bin}" ]]; then
     local npm_g_bin
     npm_g_bin="$(npm -g bin 2>/dev/null || true)"
@@ -56,9 +56,8 @@ resolve_pm2() {
     fi
   fi
 
-  # If still not found and we plan to run the app as DEPLOY_USER, try their NPM global bin
+  # Essaye le npm -g bin de l'utilisateur applicatif
   if [[ -z "${bin}" && -n "${DEPLOY_USER}" ]]; then
-    # shellcheck disable=SC2024
     local user_npm_bin
     user_npm_bin="$(sudo -H -u "$DEPLOY_USER" bash -lc 'npm -g bin 2>/dev/null || true')"
     if [[ -n "${user_npm_bin}" && -x "${user_npm_bin}/pm2" ]]; then
@@ -66,19 +65,18 @@ resolve_pm2() {
     fi
   fi
 
-  # Last-resort common locations
+  # Emplacements usuels
   for p in "/usr/local/bin/pm2" "/usr/bin/pm2" "${DEPLOY_HOME}/.npm-global/bin/pm2"; do
     [[ -z "${bin}" && -x "$p" ]] && bin="$p"
   done
 
-  # If still not found, install globally (system-wide)
+  # Installe globalement si toujours introuvable
   if [[ -z "${bin}" ]]; then
     print_warning "PM2 introuvable. Installation globale via npm..."
     npm install -g pm2
     hash -r
     bin="$(command -v pm2 || true)"
     if [[ -z "${bin}" ]]; then
-      # If npm global bin is non-standard, add it to PATH and retry
       local npm_g_bin2
       npm_g_bin2="$(npm -g bin 2>/dev/null || true)"
       if [[ -n "${npm_g_bin2}" && -x "${npm_g_bin2}/pm2" ]]; then
@@ -89,7 +87,7 @@ resolve_pm2() {
   fi
 
   if [[ -z "${bin}" ]]; then
-    print_error "Impossible de localiser ou d'installer pm2. Vérifie npm et ton réseau."
+    print_error "Impossible de localiser ou d'installer pm2. Vérifie npm et le réseau."
     exit 1
   fi
 
@@ -143,6 +141,8 @@ check_prerequisites() {
 configure_installation() {
   print_step "Configuration de l'installation..."
 
+  NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
+
   echo -e "\n${YELLOW}Dossier d'installation:${NC}"
   read -r -p "Où installer l'application? (défaut: ${DEFAULT_APP_DIR}): " APP_DIR_INPUT || true
   APP_DIR="${APP_DIR_INPUT:-$DEFAULT_APP_DIR}"
@@ -174,7 +174,7 @@ configure_installation() {
     REPO_URL="git@github.com:sebdam1010-del/baienevole.git"
     print_success "Utilisation SSH pour Git"
   else
-    REPO_URL="https://github.com/sebdam1010-del/baienevole.git"
+    REPO_URL="$REPO_URL_DEFAULT"
     print_success "Utilisation HTTPS pour Git"
   fi
 }
@@ -249,13 +249,29 @@ install_dependencies() {
 
   # Backend deps
   print_step "Backend deps..."
-  sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR' && npm ci --omit=dev || npm install --production"
+  sudo -H -u "$DEPLOY_USER" bash -lc '
+    set -e
+    cd "'"$APP_DIR"'"
+    if [[ -f package-lock.json || -f npm-shrinkwrap.json ]]; then
+      npm ci --omit=dev
+    else
+      npm install --production
+    fi
+  '
   print_success "Dépendances backend OK"
 
   # Frontend deps
   if [[ -d "$APP_DIR/client" ]]; then
     print_step "Frontend deps..."
-    sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR/client' && npm ci || npm install"
+    sudo -H -u "$DEPLOY_USER" bash -lc '
+      set -e
+      cd "'"$APP_DIR"'/client"
+      if [[ -f package-lock.json || -f npm-shrinkwrap.json ]]; then
+        npm ci
+      else
+        npm install
+      fi
+    '
     print_success "Dépendances frontend OK"
   fi
 }
@@ -285,11 +301,11 @@ build_frontend() {
 setup_pm2() {
   print_step "Configuration PM2..."
 
-  # Ensure logs dir
+  # Logs
   mkdir -p "${APP_DIR}/logs"
   chown -R "$DEPLOY_USER":"$DEPLOY_USER" "${APP_DIR}/logs"
 
-  # Ensure ecosystem file exists
+  # ecosystem.config.js par défaut si absent
   if [[ ! -f "${APP_DIR}/ecosystem.config.js" ]]; then
     cat > "${APP_DIR}/ecosystem.config.js" <<'EOF'
 module.exports = {
@@ -312,16 +328,22 @@ EOF
     print_success "ecosystem.config.js créé"
   fi
 
-  # Stop/remove existing app if any
+  # Stop existant si besoin
   sudo -H -u "$DEPLOY_USER" bash -lc "'$PM2' list | grep -q '${APP_NAME}' && '$PM2' delete '${APP_NAME}' || true"
 
-  # Start app
+  # Start & save sous l'utilisateur applicatif
   sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR' && '$PM2' start ecosystem.config.js --only '${APP_NAME}' --env production"
   sudo -H -u "$DEPLOY_USER" bash -lc "'$PM2' save"
 
-  # Startup on boot for DEPLOY_USER
-  # We pass the user's home to pm2 so it persists under the right $HOME
-  sudo -H -u "$DEPLOY_USER" bash -lc "'$PM2' startup systemd -u '${DEPLOY_USER}' --hp '${DEPLOY_HOME}'"
+  # Startup au boot (DOIT être lancé en root, avec PATH de node/pm2)
+  print_step "Activation du démarrage auto PM2..."
+  local NODE_BIN; NODE_BIN="$(dirname "$(command -v node)")"
+  local PM2_BIN_DIR; PM2_BIN_DIR="$(dirname "$PM2")"
+  # On laisse PM2 générer la commande systemd ; on passe PATH complet pour l’unité
+  env PATH="$PATH:$NODE_BIN:$PM2_BIN_DIR" "$PM2" startup systemd -u "$DEPLOY_USER" --hp "$DEPLOY_HOME" || {
+    print_warning "pm2 startup a retourné un code ≠ 0. Si besoin, copie/colle la commande affichée par PM2, puis exécute 'pm2 save' en tant que ${DEPLOY_USER}."
+  }
+
   print_success "Application démarrée via PM2 (user: ${DEPLOY_USER})"
 }
 
@@ -332,6 +354,7 @@ setup_nginx() {
     return
   fi
 
+  NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
   cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
@@ -366,70 +389,4 @@ setup_backup_cron() {
   chown -R "$DEPLOY_USER":"$DEPLOY_USER" "${APP_DIR}/backups" "${APP_DIR}/scripts" "${APP_DIR}/logs"
 
   if ! crontab -l -u "$DEPLOY_USER" 2>/dev/null | grep -q "${APP_DIR}/scripts/backup.sh"; then
-    if [[ -f "${APP_DIR}/scripts/backup.sh" ]]; then
-      chmod +x "${APP_DIR}/scripts/backup.sh"
-      (crontab -l -u "$DEPLOY_USER" 2>/dev/null; echo "0 2 * * * ${APP_DIR}/scripts/backup.sh >> ${APP_DIR}/logs/backup.log 2>&1") | crontab -u "$DEPLOY_USER" -
-      print_success "Backup quotidien (2h00) configuré pour ${DEPLOY_USER}"
-    else
-      print_warning "scripts/backup.sh introuvable, cron non ajouté."
-    fi
-  else
-    print_warning "Cron de backup déjà présent"
-  fi
-}
-
-setup_reminders_cron() {
-  print_step "Configuration rappels email..."
-  if ! crontab -l -u "$DEPLOY_USER" 2>/dev/null | grep -q "reminders:send"; then
-    (crontab -l -u "$DEPLOY_USER" 2>/dev/null; echo "0 10 * * * cd ${APP_DIR} && npm run reminders:send >> ${APP_DIR}/logs/reminders.log 2>&1") | crontab -u "$DEPLOY_USER" -
-    print_success "Rappels quotidiens (10h00) configurés"
-  else
-    print_warning "Cron de rappels déjà présent"
-  fi
-}
-
-show_summary() {
-  echo -e "\n${GREEN}========================================${NC}"
-  echo -e "${GREEN}  Déploiement terminé avec succès! 🎉${NC}"
-  echo -e "${GREEN}========================================${NC}\n"
-
-  echo -e "${BLUE}Infos:${NC}"
-  echo -e "  📁 Répertoire: ${APP_DIR}"
-  echo -e "  👤 User PM2:   ${DEPLOY_USER}"
-  echo -e "  🚀 Port:       ${APP_PORT}"
-  if [[ -n "${DOMAIN:-}" ]]; then
-    echo -e "  🌐 URL:        https://${DOMAIN}"
-  else
-    echo -e "  🌐 URL:        http://localhost:${APP_PORT}"
-  fi
-
-  echo -e "\n${BLUE}Commandes utiles:${NC}"
-  echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} status"
-  echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} logs ${APP_NAME}"
-  echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} restart ${APP_NAME}"
-}
-
-main() {
-  echo -e "${GREEN}"
-  echo "╔════════════════════════════════════════════╗"
-  echo "║   Déploiement Production - Baie des Singes ║"
-  echo "║        Plateforme de Gestion Bénévoles     ║"
-  echo "╚════════════════════════════════════════════╝"
-  echo -e "${NC}\n"
-
-  require_root
-  check_prerequisites
-  configure_installation
-  setup_repository
-  configure_env
-  install_dependencies
-  setup_database
-  build_frontend
-  setup_pm2
-  setup_nginx
-  setup_backup_cron
-  setup_reminders_cron
-  show_summary
-}
-
-main "$@"
+    if
