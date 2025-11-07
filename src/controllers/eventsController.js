@@ -163,7 +163,7 @@ exports.getAllEvents = async (req, res) => {
     const events = await db.event.findMany({
       where,
       orderBy: {
-        date: 'asc',
+        date: 'desc',
       },
       skip,
       take: pageSize,
