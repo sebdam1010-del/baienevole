@@ -288,8 +288,36 @@ setup_database() {
 build_frontend() {
   if [[ -d "$APP_DIR/client" ]]; then
     print_step "Build frontend..."
+
+    # Vérifier si le dossier dist existe déjà
+    if [[ -d "$APP_DIR/client/dist" ]]; then
+      print_warning "Le dossier client/dist existe déjà"
+      read -r -p "Rebuilder le frontend ? (Y/n): " -n 1 REPLY || true; echo
+      if [[ $REPLY =~ ^[Nn]$ ]]; then
+        print_success "Build frontend conservé"
+        return
+      fi
+      # Nettoyer l'ancien build
+      sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR/client' && rm -rf dist"
+    fi
+
     sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR/client' && npm run build"
-    print_success "Frontend buildé"
+
+    # Vérifier que le build a réussi
+    if [[ ! -d "$APP_DIR/client/dist" ]]; then
+      print_error "Le build du frontend a échoué - dossier dist introuvable"
+      exit 1
+    fi
+
+    # Vérifier que index.html existe
+    if [[ ! -f "$APP_DIR/client/dist/index.html" ]]; then
+      print_error "Le build du frontend est incomplet - index.html manquant"
+      exit 1
+    fi
+
+    print_success "Frontend buildé avec succès ($(du -sh "$APP_DIR/client/dist" | cut -f1))"
+  else
+    print_warning "Dossier client/ introuvable - application backend seule"
   fi
 }
 
@@ -299,6 +327,16 @@ setup_pm2() {
   # Logs
   mkdir -p "${APP_DIR}/logs"
   chown -R "$DEPLOY_USER":"$DEPLOY_USER" "${APP_DIR}/logs"
+
+  # Créer server.js à la racine s'il n'existe pas (point d'entrée)
+  if [[ ! -f "${APP_DIR}/server.js" ]]; then
+    cat > "${APP_DIR}/server.js" <<'EOF'
+// Point d'entrée pour PM2 - délègue au serveur principal
+require('./src/server.js');
+EOF
+    chown "$DEPLOY_USER":"$DEPLOY_USER" "${APP_DIR}/server.js"
+    print_success "server.js créé à la racine"
+  fi
 
   # ecosystem.config.js par défaut si absent
   if [[ ! -f "${APP_DIR}/ecosystem.config.js" ]]; then
@@ -315,6 +353,10 @@ module.exports = {
       time: true,
       instances: 1,
       exec_mode: "fork",
+      // Auto-restart on crash
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: "10s",
     },
   ],
 };
@@ -323,12 +365,53 @@ EOF
     print_success "ecosystem.config.js créé"
   fi
 
+  # Vérifications avant démarrage
+  print_step "Vérifications finales avant démarrage..."
+
+  # Vérifier que server.js existe
+  if [[ ! -f "${APP_DIR}/server.js" ]]; then
+    print_error "server.js introuvable à la racine du projet"
+    exit 1
+  fi
+
+  # Vérifier que le frontend est buildé (si dossier client existe)
+  if [[ -d "${APP_DIR}/client" ]]; then
+    if [[ ! -d "${APP_DIR}/client/dist" ]]; then
+      print_error "Le frontend n'est pas buildé (client/dist manquant)"
+      print_error "Exécutez: cd ${APP_DIR}/client && npm run build"
+      exit 1
+    fi
+    if [[ ! -f "${APP_DIR}/client/dist/index.html" ]]; then
+      print_error "Le build du frontend est incomplet (index.html manquant)"
+      exit 1
+    fi
+    print_success "Frontend build trouvé ($(du -sh "${APP_DIR}/client/dist" 2>/dev/null | cut -f1))"
+  fi
+
+  # Vérifier que .env existe
+  if [[ ! -f "${APP_DIR}/.env" ]]; then
+    print_error ".env introuvable - l'application ne pourra pas démarrer"
+    exit 1
+  fi
+  print_success "Toutes les vérifications sont OK"
+
   # Stop existant si besoin
   sudo -H -u "$DEPLOY_USER" bash -lc "'$PM2' list | grep -q '${APP_NAME}' && '$PM2' delete '${APP_NAME}' || true"
 
   # Start & save sous l'utilisateur applicatif
+  print_step "Démarrage de l'application avec PM2..."
   sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR' && '$PM2' start ecosystem.config.js --only '${APP_NAME}' --env production"
+
+  # Attendre quelques secondes et vérifier que l'app tourne
+  sleep 3
+  if ! sudo -H -u "$DEPLOY_USER" bash -lc "'$PM2' list | grep -q '${APP_NAME}.*online'"; then
+    print_error "L'application n'a pas démarré correctement"
+    print_error "Vérifiez les logs: sudo -H -u ${DEPLOY_USER} ${PM2} logs ${APP_NAME}"
+    exit 1
+  fi
+
   sudo -H -u "$DEPLOY_USER" bash -lc "'$PM2' save"
+  print_success "Application démarrée et en ligne"
 
   # Startup au boot (DOIT être lancé en root, avec PATH de node/pm2)
   print_step "Activation du démarrage auto PM2..."
