@@ -389,4 +389,70 @@ setup_backup_cron() {
   chown -R "$DEPLOY_USER":"$DEPLOY_USER" "${APP_DIR}/backups" "${APP_DIR}/scripts" "${APP_DIR}/logs"
 
   if ! crontab -l -u "$DEPLOY_USER" 2>/dev/null | grep -q "${APP_DIR}/scripts/backup.sh"; then
-    if
+    if [[ -f "${APP_DIR}/scripts/backup.sh" ]]; then
+      chmod +x "${APP_DIR}/scripts/backup.sh"
+      (crontab -l -u "$DEPLOY_USER" 2>/dev/null; echo "0 2 * * * ${APP_DIR}/scripts/backup.sh >> ${APP_DIR}/logs/backup.log 2>&1") | crontab -u "$DEPLOY_USER" -
+      print_success "Backup quotidien (2h00) configuré pour ${DEPLOY_USER}"
+    else
+      print_warning "scripts/backup.sh introuvable, cron non ajouté."
+    fi
+  else
+    print_warning "Cron de backup déjà présent"
+  fi
+}
+
+setup_reminders_cron() {
+  print_step "Configuration rappels email..."
+  if ! crontab -l -u "$DEPLOY_USER" 2>/dev/null | grep -q "reminders:send"; then
+    (crontab -l -u "$DEPLOY_USER" 2>/dev/null; echo "0 10 * * * cd ${APP_DIR} && npm run reminders:send >> ${APP_DIR}/logs/reminders.log 2>&1") | crontab -u "$DEPLOY_USER" -
+    print_success "Rappels quotidiens (10h00) configurés"
+  else
+    print_warning "Cron de rappels déjà présent"
+  fi
+}
+
+show_summary() {
+  echo -e "\n${GREEN}========================================${NC}"
+  echo -e "${GREEN}  Déploiement terminé avec succès! 🎉${NC}"
+  echo -e "${GREEN}========================================${NC}\n"
+
+  echo -e "${BLUE}Infos:${NC}"
+  echo -e "  📁 Répertoire: ${APP_DIR}"
+  echo -e "  👤 User PM2:   ${DEPLOY_USER}"
+  echo -e "  🚀 Port:       ${APP_PORT}"
+  if [[ -n "${DOMAIN:-}" ]]; then
+    echo -e "  🌐 URL:        https://${DOMAIN}"
+  else
+    echo -e "  🌐 URL:        http://localhost:${APP_PORT}"
+  fi
+
+  echo -e "\n${BLUE}Commandes utiles:${NC}"
+  echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} status"
+  echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} logs ${APP_NAME}"
+  echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} restart ${APP_NAME}"
+}
+
+main() {
+  echo -e "${GREEN}"
+  echo "╔════════════════════════════════════════════╗"
+  echo "║   Déploiement Production - Baie des Singes ║"
+  echo "║        Plateforme de Gestion Bénévoles     ║"
+  echo "╚════════════════════════════════════════════╝"
+  echo -e "${NC}\n"
+
+  require_root
+  check_prerequisites
+  configure_installation
+  setup_repository
+  configure_env
+  install_dependencies
+  setup_database
+  build_frontend
+  setup_pm2
+  setup_nginx
+  setup_backup_cron
+  setup_reminders_cron
+  show_summary
+}
+
+main "$@"
