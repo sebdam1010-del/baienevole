@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Card, Select, Badge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import api, { getImageUrl } from '../services/api';
 
 const Events = () => {
   const { user } = useAuth();
@@ -16,22 +16,59 @@ const Events = () => {
     annee: '',
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const currentWeekRef = useRef(null);
+  const hasScrolled = useRef(false);
 
   useEffect(() => {
-    fetchEvents();
+    const controller = new AbortController();
+    fetchEvents(controller.signal);
+    return () => controller.abort();
   }, [filters]);
 
-  const fetchEvents = async () => {
+  // Scroll vers la semaine en cours lors du chargement initial
+  useEffect(() => {
+    if (!loading && events.length > 0 && currentWeekRef.current && !hasScrolled.current) {
+      setTimeout(() => {
+        currentWeekRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+        hasScrolled.current = true;
+      }, 300);
+    }
+  }, [loading, events]);
+
+  // Fermer les alertes au scroll ou au clic
+  useEffect(() => {
+    const handleDismissAlerts = () => {
+      if (error) setError('');
+      if (successMessage) setSuccessMessage('');
+    };
+
+    window.addEventListener('scroll', handleDismissAlerts);
+    window.addEventListener('click', handleDismissAlerts);
+
+    return () => {
+      window.removeEventListener('scroll', handleDismissAlerts);
+      window.removeEventListener('click', handleDismissAlerts);
+    };
+  }, [error, successMessage]);
+
+  const fetchEvents = async (signal) => {
     try {
       setLoading(true);
       const params = {};
       if (filters.saison) params.saison = filters.saison;
       if (filters.annee) params.annee = filters.annee;
 
-      const response = await api.get('/events', { params });
+      const response = await api.get('/events', { params, signal });
       setEvents(response.data);
       setError('');
     } catch (err) {
+      // Ignore abort errors (they're expected when component unmounts)
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
       setError('Erreur lors du chargement des événements');
       console.error(err);
     } finally {
@@ -73,6 +110,11 @@ const Events = () => {
     return event.registrations.some(reg => reg.userId === user.id);
   };
 
+  const isEventPast = (event) => {
+    if (!event) return false;
+    return new Date(event.date) < new Date();
+  };
+
   const handleRegister = async (eventId) => {
     try {
       setActionLoading(prev => ({ ...prev, [eventId]: true }));
@@ -80,7 +122,15 @@ const Events = () => {
       setSuccessMessage('');
       await api.post(`/events/${eventId}/register`);
       setSuccessMessage('Inscription réussie !');
-      await fetchEvents(); // Refresh to show updated registration
+
+      // Update only the specific event instead of refreshing all
+      const updatedEvent = await api.get(`/events/${eventId}`);
+      setEvents(prevEvents =>
+        prevEvents.map(event =>
+          event.id === eventId ? updatedEvent.data : event
+        )
+      );
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
@@ -97,7 +147,15 @@ const Events = () => {
       setSuccessMessage('');
       await api.delete(`/events/${eventId}/register`);
       setSuccessMessage('Désinscription réussie !');
-      await fetchEvents(); // Refresh to show updated registration
+
+      // Update only the specific event instead of refreshing all
+      const updatedEvent = await api.get(`/events/${eventId}`);
+      setEvents(prevEvents =>
+        prevEvents.map(event =>
+          event.id === eventId ? updatedEvent.data : event
+        )
+      );
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
@@ -121,6 +179,47 @@ const Events = () => {
     return event.nom.toLowerCase().includes(query);
   });
 
+  // Extract unique seasons and years from events - using useMemo to ensure proper updates
+  const availableSeasons = useMemo(() => {
+    return [...new Set(
+      events
+        .map(e => e.saison)
+        .filter(saison => saison != null && !isNaN(saison))
+    )].sort((a, b) => a - b);
+  }, [events]);
+
+  const availableYears = useMemo(() => {
+    return [...new Set(
+      events
+        .map(e => {
+          try {
+            const year = new Date(e.date).getFullYear();
+            return !isNaN(year) && year > 1900 && year < 2100 ? year : null;
+          } catch {
+            return null;
+          }
+        })
+        .filter(year => year != null)
+    )].sort((a, b) => b - a);
+  }, [events]);
+
+  // Trouver l'index de l'événement de la semaine en cours (premier événement futur ou plus récent)
+  const currentWeekEventIndex = useMemo(() => {
+    if (filteredEvents.length === 0) return -1;
+
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Chercher le premier événement futur ou dans la semaine passée
+    const index = filteredEvents.findIndex(event => {
+      const eventDate = new Date(event.date);
+      return eventDate >= oneWeekAgo;
+    });
+
+    // Si aucun événement futur, retourner le dernier événement
+    return index >= 0 ? index : filteredEvents.length - 1;
+  }, [filteredEvents]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -137,7 +236,7 @@ const Events = () => {
 
       {error && (
         <div
-          className="p-3 rounded border text-sm"
+          className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 p-4 rounded-lg border text-sm shadow-lg max-w-md w-full mx-4"
           style={{
             backgroundColor: '#FEE2E2',
             borderColor: 'var(--color-baie-red)',
@@ -150,7 +249,7 @@ const Events = () => {
 
       {successMessage && (
         <div
-          className="p-3 rounded border text-sm"
+          className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 p-4 rounded-lg border text-sm shadow-lg max-w-md w-full mx-4"
           style={{
             backgroundColor: '#D1FAE5',
             borderColor: 'var(--color-baie-green)',
@@ -190,10 +289,11 @@ const Events = () => {
               onChange={handleFilterChange}
             >
               <option value="">Toutes les saisons</option>
-              <option value="1">Saison 1</option>
-              <option value="2">Saison 2</option>
-              <option value="3">Saison 3</option>
-              <option value="4">Saison 4</option>
+              {availableSeasons.map(saison => (
+                <option key={saison} value={saison}>
+                  Saison {saison}
+                </option>
+              ))}
             </Select>
 
             <Select
@@ -203,9 +303,11 @@ const Events = () => {
               onChange={handleFilterChange}
             >
               <option value="">Toutes les années</option>
-              <option value="2024">2024</option>
-              <option value="2025">2025</option>
-              <option value="2026">2026</option>
+              {availableYears.map(year => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
             </Select>
           </div>
         </div>
@@ -222,51 +324,61 @@ const Events = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEvents.map((event) => {
+          {filteredEvents.map((event, index) => {
             const volunteerNames = getVolunteerNames(event);
             const quotaColor = getQuotaColor(event);
             const registered = isUserRegistered(event);
+            const isCurrentWeek = index === currentWeekEventIndex;
 
             return (
-              <Card key={event.id} className="relative overflow-hidden p-0">
-                {/* Event Image with Lazy Loading */}
-                {event.imageUrl && (
-                  <div className="relative w-full h-48 bg-gray-200">
-                    <img
-                      src={event.imageUrl}
-                      alt={event.nom}
-                      loading="lazy"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                    {/* Quota Status Dot on Image */}
-                    <div
-                      className="absolute top-3 right-3 rounded-full shadow-lg"
-                      style={{
-                        backgroundColor: quotaColor,
-                        width: '20px',
-                        height: '20px',
-                      }}
-                      title={`Statut: ${quotaColor === '#ABD4A9' ? 'OK' : quotaColor === '#EF7856' ? 'Orange' : 'Rouge'}`}
-                    />
-                  </div>
-                )}
-
-                <div className="p-4 space-y-3">
-                  {/* Quota Status Dot (if no image) */}
-                  {!event.imageUrl && (
-                    <div
-                      className="absolute top-4 right-4 rounded-full"
-                      style={{
-                        backgroundColor: quotaColor,
-                        width: '16px',
-                        height: '16px',
-                      }}
-                      title={`Statut: ${quotaColor === '#ABD4A9' ? 'OK' : quotaColor === '#EF7856' ? 'Orange' : 'Rouge'}`}
-                    />
+              <Card
+                key={event.id}
+                className="relative overflow-hidden p-0"
+                ref={isCurrentWeek ? currentWeekRef : null}
+              >
+                <div className="flex items-start">
+                  {/* Event Image with Lazy Loading - Portrait à gauche */}
+                  {event.imageUrl && (
+                    <div className="relative w-48 flex-shrink-0 bg-gray-200">
+                      <img
+                        src={getImageUrl(event.imageUrl)}
+                        alt={event.nom}
+                        loading="lazy"
+                        className="w-full h-full object-cover object-top"
+                        style={{ minHeight: '280px' }}
+                        onError={(e) => {
+                          e.target.parentElement.style.display = 'none';
+                        }}
+                      />
+                      {/* Quota Status Dot on Image */}
+                      <div
+                        className="absolute top-2 right-2 rounded-full shadow-lg"
+                        style={{
+                          backgroundColor: quotaColor,
+                          width: '16px',
+                          height: '16px',
+                        }}
+                        title={`Statut: ${quotaColor === '#ABD4A9' ? 'OK' : quotaColor === '#EF7856' ? 'Orange' : 'Rouge'}`}
+                      />
+                    </div>
                   )}
+
+                  <div className="p-4 flex-1 flex flex-col justify-between" style={{ minHeight: '280px' }}>
+                    {/* Quota Status Dot (if no image) */}
+                    {!event.imageUrl && (
+                      <div
+                        className="absolute top-4 right-4 rounded-full"
+                        style={{
+                          backgroundColor: quotaColor,
+                          width: '16px',
+                          height: '16px',
+                        }}
+                        title={`Statut: ${quotaColor === '#ABD4A9' ? 'OK' : quotaColor === '#EF7856' ? 'Orange' : 'Rouge'}`}
+                      />
+                    )}
+
+                  {/* Content top section */}
+                  <div className="space-y-3">
 
                   {/* Event Title */}
                   <h3
@@ -305,10 +417,15 @@ const Events = () => {
                   ) : (
                     <p className="text-xs text-gray-500">Aucun bénévole inscrit</p>
                   )}
+                  </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-2">
-                    {registered ? (
+                  {/* Action Buttons - Bottom section */}
+                  <div className="flex gap-2">
+                    {isEventPast(event) ? (
+                      <div className="flex-1 text-xs text-gray-500 flex items-center justify-center">
+                        Événement terminé
+                      </div>
+                    ) : registered ? (
                       <Button
                         variant="danger"
                         size="sm"
@@ -338,6 +455,7 @@ const Events = () => {
                         Détails →
                       </Button>
                     </Link>
+                  </div>
                   </div>
                 </div>
               </Card>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Card } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import api, { getImageUrl } from '../services/api';
 
 const EventDetail = () => {
   const { id } = useParams();
@@ -17,6 +17,22 @@ const EventDetail = () => {
   useEffect(() => {
     fetchEvent();
   }, [id]);
+
+  // Fermer les alertes au scroll ou au clic
+  useEffect(() => {
+    const handleDismissAlerts = () => {
+      if (error) setError('');
+      if (successMessage) setSuccessMessage('');
+    };
+
+    window.addEventListener('scroll', handleDismissAlerts);
+    window.addEventListener('click', handleDismissAlerts);
+
+    return () => {
+      window.removeEventListener('scroll', handleDismissAlerts);
+      window.removeEventListener('click', handleDismissAlerts);
+    };
+  }, [error, successMessage]);
 
   const fetchEvent = async () => {
     try {
@@ -57,6 +73,11 @@ const EventDetail = () => {
   const isUserRegistered = () => {
     if (!user || !event || !event.registrations) return false;
     return event.registrations.some(reg => reg.userId === user.id);
+  };
+
+  const isEventPast = () => {
+    if (!event) return false;
+    return new Date(event.date) < new Date();
   };
 
   const handleRegister = async () => {
@@ -116,7 +137,7 @@ const EventDetail = () => {
 
       {error && (
         <div
-          className="p-3 rounded border text-sm"
+          className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 p-4 rounded-lg border text-sm shadow-lg max-w-md w-full mx-4"
           style={{
             backgroundColor: '#FEE2E2',
             borderColor: 'var(--color-baie-red)',
@@ -129,7 +150,7 @@ const EventDetail = () => {
 
       {successMessage && (
         <div
-          className="p-3 rounded border text-sm"
+          className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 p-4 rounded-lg border text-sm shadow-lg max-w-md w-full mx-4"
           style={{
             backgroundColor: '#D1FAE5',
             borderColor: 'var(--color-baie-green)',
@@ -140,29 +161,32 @@ const EventDetail = () => {
         </div>
       )}
 
-      {/* Event Image */}
-      {event.imageUrl && (
-        <div className="w-full h-96 bg-gray-200 rounded-lg overflow-hidden">
-          <img
-            src={event.imageUrl}
-            alt={event.nom}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.target.style.display = 'none';
-            }}
-          />
-        </div>
-      )}
-
       {/* Event Details Card */}
       <Card>
-        <div className="space-y-4">
-          <h1
-            className="text-3xl"
-            style={{ fontFamily: 'var(--font-family-protest)', color: 'var(--color-baie-navy)' }}
-          >
-            {event.nom}
-          </h1>
+        <div className="flex items-start gap-6">
+          {/* Event Image - Portrait à gauche */}
+          {event.imageUrl && (
+            <div className="w-64 flex-shrink-0 bg-gray-200 rounded-lg overflow-hidden">
+              <img
+                src={getImageUrl(event.imageUrl)}
+                alt={event.nom}
+                className="w-full h-full object-cover object-top"
+                style={{ minHeight: '400px' }}
+                onError={(e) => {
+                  e.target.parentElement.style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+
+          {/* Event content */}
+          <div className="flex-1 space-y-4">
+            <h1
+              className="text-3xl"
+              style={{ fontFamily: 'var(--font-family-protest)', color: 'var(--color-baie-navy)' }}
+            >
+              {event.nom}
+            </h1>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
@@ -215,7 +239,11 @@ const EventDetail = () => {
           )}
 
           <div className="pt-4">
-            {isUserRegistered() ? (
+            {isEventPast() ? (
+              <div className="text-sm text-gray-600">
+                Cet événement est terminé. L'inscription n'est plus possible.
+              </div>
+            ) : isUserRegistered() ? (
               <Button
                 variant="danger"
                 onClick={handleUnregister}
@@ -232,6 +260,7 @@ const EventDetail = () => {
                 {actionLoading ? 'Inscription...' : 'S\'inscrire à cet événement'}
               </Button>
             )}
+          </div>
           </div>
         </div>
       </Card>

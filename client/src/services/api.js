@@ -36,4 +36,18 @@ api.interceptors.response.use(
   }
 );
 
+// Helper pour construire l'URL complète d'une image
+export const getImageUrl = (imagePath) => {
+  if (!imagePath) return null;
+
+  // Si l'URL est déjà complète, la retourner telle quelle
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+
+  // Sinon, construire l'URL complète avec le backend
+  const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
+  return `${backendUrl}${imagePath}`;
+};
+
 export default api;

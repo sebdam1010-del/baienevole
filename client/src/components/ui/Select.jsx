@@ -11,6 +11,7 @@ const Select = ({
   disabled = false,
   placeholder = 'Sélectionner...',
   className = '',
+  children,
   ...props
 }) => {
   const selectId = id || name;
@@ -42,16 +43,21 @@ const Select = ({
         style={!error ? { borderColor: 'var(--color-baie-beige)', '--tw-ring-color': 'var(--color-baie-navy)' } : {}}
         {...props}
       >
-        {placeholder && (
-          <option value="" disabled>
-            {placeholder}
-          </option>
+        {/* Support both children and options prop */}
+        {children ? children : (
+          <>
+            {placeholder && (
+              <option value="" disabled>
+                {placeholder}
+              </option>
+            )}
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </>
         )}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
       </select>
       {error && (
         <p className="mt-1 text-sm text-red-500">{error}</p>

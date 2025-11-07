@@ -20,7 +20,13 @@ const isWithin24Hours = (eventDate) => {
   const now = new Date();
   const timeDiff = eventDate.getTime() - now.getTime();
   const hoursDiff = timeDiff / (1000 * 60 * 60);
-  return hoursDiff < 24;
+  return hoursDiff < 24 && hoursDiff > 0; // Only future events within 24 hours
+};
+
+// Helper to check if event is in the past
+const isEventPast = (eventDate) => {
+  const now = new Date();
+  return eventDate.getTime() < now.getTime();
 };
 
 // Helper to check for time conflicts
@@ -195,7 +201,20 @@ exports.getEventById = async (req, res) => {
     const event = await db.event.findUnique({
       where: { id },
       include: {
-        registrations: true,
+        registrations: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
       },
     });
 
@@ -211,9 +230,8 @@ exports.getEventById = async (req, res) => {
       event.nombreBenevolesRequis
     );
 
-    const { registrations, ...eventData } = event;
     res.status(200).json({
-      ...eventData,
+      ...event,
       quotaStatus,
     });
   } catch (error) {
@@ -529,10 +547,17 @@ exports.registerForEvent = async (req, res) => {
       });
     }
 
+    // Check if event is in the past
+    if (isEventPast(event.date)) {
+      return res.status(400).json({
+        error: 'Cannot register for past events.',
+      });
+    }
+
     // Check if event is within 24 hours
     if (isWithin24Hours(event.date)) {
       return res.status(400).json({
-        error: 'Registration closed. Events must be registered at least 24 hours in advance.',
+        error: 'Inscriptions fermées. Les événements doivent être réservés au moins 24 heures à l\'avance.',
       });
     }
 
