@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Modal, Input, Select, Badge, Card, Textarea } from '../../components/ui';
+import { Table, Button, Modal, Input, Select, Badge, Card, Textarea, RichTextEditor } from '../../components/ui';
 import api from '../../services/api';
 
 const AdminEvents = () => {
@@ -532,14 +532,12 @@ const AdminEvents = () => {
             helperText="Optionnel"
           />
 
-          <Textarea
+          <RichTextEditor
             label="Description"
-            name="description"
             value={eventFormData.description}
-            onChange={handleEventFormChange}
+            onChange={(html) => setEventFormData(prev => ({ ...prev, description: html }))}
             placeholder="Description de l'événement..."
-            rows={3}
-            helperText="Optionnel"
+            helperText="Optionnel - Utilisez l'éditeur pour formater le texte"
           />
 
           <Textarea

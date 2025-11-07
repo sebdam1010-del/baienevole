@@ -5,392 +5,337 @@
 # Baie des Singes - Plateforme Bénévoles
 #############################################
 
-set -e  # Arrêter en cas d'erreur
+set -Eeuo pipefail
 
-# Couleurs pour l'output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# -------- Error handling --------
+trap 'echo -e "\033[0;31m✗ Error on line $LINENO. Aborting.\033[0m" >&2' ERR
 
-# Configuration par défaut
-APP_NAME="baienevole"
-DEFAULT_APP_DIR="/var/www/baienevole"
-REPO_URL="https://github.com/sebdam1010-del/baienevole.git"
-NODE_VERSION="18"
-NGINX_CONF="/etc/nginx/sites-available/baienevole"
+# -------- Colors --------
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; BLUE='\033[0;34m'; NC='\033[0m'
 
-# Variables qui seront définies par l'utilisateur
+# -------- Defaults --------
+APP_NAME="${APP_NAME:-baienevole}"
+DEFAULT_APP_DIR="${DEFAULT_APP_DIR:-/var/www/baienevole}"
+REPO_URL="${REPO_URL:-https://github.com/sebdam1010-del/baienevole.git}"
+NODE_VERSION_MAJOR="${NODE_VERSION:-18}"
+NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
+
+# Run user (non-root) for the Node app/PM2; fallback to the sudo caller if present
+DEPLOY_USER="${DEPLOY_USER:-${SUDO_USER:-$(id -un)}}"
+DEPLOY_HOME="$(getent passwd "$DEPLOY_USER" | cut -d: -f6)"
+
 APP_DIR=""
 USE_SSH=false
 
-# Fonction d'affichage
-print_step() {
-    echo -e "\n${BLUE}==>${NC} ${1}"
+print_step()    { echo -e "\n${BLUE}==>${NC} $*"; }
+print_success() { echo -e "${GREEN}✓${NC} $*"; }
+print_warning() { echo -e "${YELLOW}⚠${NC} $*"; }
+print_error()   { echo -e "${RED}✗${NC} $*"; }
+
+require_root() {
+  if [[ $EUID -ne 0 ]]; then
+    print_error "Ce script doit être exécuté en tant que root (sudo)."
+    exit 1
+  fi
 }
 
-print_success() {
-    echo -e "${GREEN}✓${NC} ${1}"
-}
+# ---------- PM2 resolution (KEY FIX) ----------
+# Finds a working pm2 binary and exports PM2 variable.
+resolve_pm2() {
+  # Try direct resolution
+  local bin
+  bin="$(command -v pm2 || true)"
 
-print_warning() {
-    echo -e "${YELLOW}⚠${NC} ${1}"
-}
-
-print_error() {
-    echo -e "${RED}✗${NC} ${1}"
-}
-
-# Vérification que le script est exécuté en root
-check_root() {
-    if [[ $EUID -ne 0 ]]; then
-        print_error "Ce script doit être exécuté en tant que root (sudo)"
-        exit 1
+  # If not found, try npm -g bin for the *current* user (root here)
+  if [[ -z "${bin}" ]]; then
+    local npm_g_bin
+    npm_g_bin="$(npm -g bin 2>/dev/null || true)"
+    if [[ -n "${npm_g_bin}" && -x "${npm_g_bin}/pm2" ]]; then
+      export PATH="${npm_g_bin}:$PATH"
+      bin="${npm_g_bin}/pm2"
     fi
+  fi
+
+  # If still not found and we plan to run the app as DEPLOY_USER, try their NPM global bin
+  if [[ -z "${bin}" && -n "${DEPLOY_USER}" ]]; then
+    # shellcheck disable=SC2024
+    local user_npm_bin
+    user_npm_bin="$(sudo -H -u "$DEPLOY_USER" bash -lc 'npm -g bin 2>/dev/null || true')"
+    if [[ -n "${user_npm_bin}" && -x "${user_npm_bin}/pm2" ]]; then
+      bin="${user_npm_bin}/pm2"
+    fi
+  fi
+
+  # Last-resort common locations
+  for p in "/usr/local/bin/pm2" "/usr/bin/pm2" "${DEPLOY_HOME}/.npm-global/bin/pm2"; do
+    [[ -z "${bin}" && -x "$p" ]] && bin="$p"
+  done
+
+  # If still not found, install globally (system-wide)
+  if [[ -z "${bin}" ]]; then
+    print_warning "PM2 introuvable. Installation globale via npm..."
+    npm install -g pm2
+    hash -r
+    bin="$(command -v pm2 || true)"
+    if [[ -z "${bin}" ]]; then
+      # If npm global bin is non-standard, add it to PATH and retry
+      local npm_g_bin2
+      npm_g_bin2="$(npm -g bin 2>/dev/null || true)"
+      if [[ -n "${npm_g_bin2}" && -x "${npm_g_bin2}/pm2" ]]; then
+        export PATH="${npm_g_bin2}:$PATH"
+        bin="${npm_g_bin2}/pm2"
+      fi
+    fi
+  fi
+
+  if [[ -z "${bin}" ]]; then
+    print_error "Impossible de localiser ou d'installer pm2. Vérifie npm et ton réseau."
+    exit 1
+  fi
+
+  export PM2="${bin}"
+  print_success "PM2 détecté: ${PM2}"
 }
 
-# Vérification des prérequis
 check_prerequisites() {
-    print_step "Vérification des prérequis..."
+  print_step "Vérification des prérequis..."
 
-    # Vérifier Node.js
-    if ! command -v node &> /dev/null; then
-        print_error "Node.js n'est pas installé"
-        echo "Installation de Node.js ${NODE_VERSION}..."
-        curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
-        apt-get install -y nodejs
-    fi
+  # Node.js
+  if ! command -v node >/dev/null 2>&1; then
+    print_warning "Node.js non installé. Installation Node ${NODE_VERSION_MAJOR}..."
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION_MAJOR}.x" | bash -
+    apt-get install -y nodejs
+  fi
+  local detected_major
+  detected_major="$(node -v | cut -d'.' -f1 | sed 's/v//')"
+  if (( detected_major < NODE_VERSION_MAJOR )); then
+    print_warning "Node v${detected_major} détecté. Recommandé: v${NODE_VERSION_MAJOR}+."
+  else
+    print_success "Node $(node -v) OK"
+  fi
 
-    local NODE_MAJOR=$(node -v | cut -d'.' -f1 | sed 's/v//')
-    if [[ $NODE_MAJOR -lt $NODE_VERSION ]]; then
-        print_warning "Node.js version ${NODE_MAJOR} détectée. Version ${NODE_VERSION}+ recommandée."
-    else
-        print_success "Node.js $(node -v) installé"
-    fi
+  # npm
+  if ! command -v npm >/dev/null 2>&1; then
+    print_error "npm non trouvé après installation de Node."
+    exit 1
+  fi
+  print_success "npm $(npm -v) OK"
 
-    # Vérifier npm
-    if ! command -v npm &> /dev/null; then
-        print_error "npm n'est pas installé"
-        exit 1
-    fi
-    print_success "npm $(npm -v) installé"
+  # pm2
+  resolve_pm2
 
-    # Vérifier PM2
-    if ! command -v pm2 &> /dev/null; then
-        print_warning "PM2 n'est pas installé. Installation..."
-        npm install -g pm2
-    fi
-    print_success "PM2 installé"
+  # nginx
+  if ! command -v nginx >/dev/null 2>&1; then
+    print_warning "Nginx non installé. Installation..."
+    apt-get update
+    apt-get install -y nginx
+  fi
+  print_success "Nginx OK"
 
-    # Vérifier Nginx
-    if ! command -v nginx &> /dev/null; then
-        print_warning "Nginx n'est pas installé. Installation..."
-        apt-get update
-        apt-get install -y nginx
-    fi
-    print_success "Nginx installé"
-
-    # Vérifier Git
-    if ! command -v git &> /dev/null; then
-        print_error "Git n'est pas installé"
-        apt-get install -y git
-    fi
-    print_success "Git installé"
+  # git
+  if ! command -v git >/dev/null 2>&1; then
+    print_warning "Git non installé. Installation..."
+    apt-get install -y git
+  fi
+  print_success "Git OK"
 }
 
-# Demander le dossier d'installation et la méthode Git
 configure_installation() {
-    print_step "Configuration de l'installation..."
+  print_step "Configuration de l'installation..."
 
-    echo -e "\n${YELLOW}Dossier d'installation:${NC}"
-    read -p "Où voulez-vous installer l'application? (défaut: ${DEFAULT_APP_DIR}): " APP_DIR
-    APP_DIR=${APP_DIR:-$DEFAULT_APP_DIR}
+  echo -e "\n${YELLOW}Dossier d'installation:${NC}"
+  read -r -p "Où installer l'application? (défaut: ${DEFAULT_APP_DIR}): " APP_DIR_INPUT || true
+  APP_DIR="${APP_DIR_INPUT:-$DEFAULT_APP_DIR}"
 
-    # Créer le dossier parent si nécessaire
-    PARENT_DIR=$(dirname "$APP_DIR")
-    if [[ ! -d "$PARENT_DIR" ]]; then
-        print_warning "Le dossier parent ${PARENT_DIR} n'existe pas"
-        read -p "Voulez-vous le créer? (Y/n): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            mkdir -p "$PARENT_DIR"
-            print_success "Dossier parent créé"
-        else
-            print_error "Installation annulée"
-            exit 1
-        fi
-    fi
-
-    print_success "Dossier d'installation: ${APP_DIR}"
-
-    # Demander la méthode de connexion Git
-    echo -e "\n${YELLOW}Configuration Git:${NC}"
-    echo "Comment voulez-vous cloner le repository?"
-    echo "  1) HTTPS (simple, pas de clé SSH requise)"
-    echo "  2) SSH (nécessite une clé SSH configurée)"
-    read -p "Votre choix (1/2, défaut: 1): " GIT_METHOD
-    GIT_METHOD=${GIT_METHOD:-1}
-
-    if [[ "$GIT_METHOD" == "2" ]]; then
-        USE_SSH=true
-        REPO_URL="git@github.com:sebdam1010-del/baienevole.git"
-
-        echo -e "\n${YELLOW}Configuration de la clé SSH:${NC}"
-        echo "Clés SSH disponibles:"
-        ls -1 ~/.ssh/*.pub 2>/dev/null | sed 's/\.pub$//' || echo "  Aucune clé SSH trouvée"
-
-        read -p "Chemin vers votre clé SSH privée (défaut: ~/.ssh/id_rsa): " SSH_KEY
-        SSH_KEY=${SSH_KEY:-~/.ssh/id_rsa}
-
-        # Vérifier que la clé existe
-        if [[ ! -f "$SSH_KEY" ]]; then
-            print_error "La clé SSH ${SSH_KEY} n'existe pas"
-            read -p "Voulez-vous générer une nouvelle clé SSH? (y/N): " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                read -p "Email pour la clé SSH: " SSH_EMAIL
-                ssh-keygen -t ed25519 -C "$SSH_EMAIL" -f "$SSH_KEY"
-                print_success "Clé SSH générée: ${SSH_KEY}"
-                print_warning "IMPORTANT: Ajoutez cette clé publique à votre compte GitHub:"
-                echo -e "\n${BLUE}$(cat ${SSH_KEY}.pub)${NC}\n"
-                print_warning "1. Allez sur https://github.com/settings/keys"
-                print_warning "2. Cliquez sur 'New SSH key'"
-                print_warning "3. Collez la clé ci-dessus"
-                read -p "Appuyez sur Entrée une fois la clé ajoutée sur GitHub..."
-            else
-                print_error "Installation annulée"
-                exit 1
-            fi
-        fi
-
-        # Configurer SSH pour utiliser la clé
-        export GIT_SSH_COMMAND="ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no"
-        print_success "Utilisation de la clé SSH: ${SSH_KEY}"
-
-        # Tester la connexion SSH
-        print_step "Test de la connexion SSH à GitHub..."
-        if ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
-            print_success "Connexion SSH à GitHub réussie"
-        else
-            print_warning "Impossible de vérifier la connexion SSH"
-            print_warning "Si le clone échoue, vérifiez que la clé est bien ajoutée sur GitHub"
-        fi
+  local PARENT_DIR
+  PARENT_DIR="$(dirname "$APP_DIR")"
+  if [[ ! -d "$PARENT_DIR" ]]; then
+    print_warning "Le dossier parent ${PARENT_DIR} n'existe pas."
+    read -r -p "Le créer ? (Y/n): " -n 1 REPLY || true; echo
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+      mkdir -p "$PARENT_DIR"
+      chown -R "$DEPLOY_USER":"$DEPLOY_USER" "$PARENT_DIR"
+      print_success "Dossier parent créé"
     else
-        REPO_URL="https://github.com/sebdam1010-del/baienevole.git"
-        print_success "Utilisation de HTTPS pour cloner le repository"
+      print_error "Installation annulée"
+      exit 1
     fi
+  fi
+  print_success "Dossier d'installation: ${APP_DIR}"
 
-    # Mettre à jour le chemin de configuration Nginx
-    NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
+  echo -e "\n${YELLOW}Méthode Git:${NC}
+  1) HTTPS (simple)
+  2) SSH (clé requise)"
+  read -r -p "Votre choix (1/2, défaut: 1): " GIT_METHOD || true
+  GIT_METHOD="${GIT_METHOD:-1}"
+
+  if [[ "$GIT_METHOD" == "2" ]]; then
+    USE_SSH=true
+    REPO_URL="git@github.com:sebdam1010-del/baienevole.git"
+    print_success "Utilisation SSH pour Git"
+  else
+    REPO_URL="https://github.com/sebdam1010-del/baienevole.git"
+    print_success "Utilisation HTTPS pour Git"
+  fi
 }
 
-# Demander les informations de configuration
+setup_repository() {
+  print_step "Configuration du repository..."
+
+  if [[ -d "$APP_DIR/.git" ]]; then
+    print_step "Pull des mises à jour..."
+    git -C "$APP_DIR" fetch origin
+    git -C "$APP_DIR" pull --rebase --autostash origin main
+    print_success "Repository mis à jour"
+  else
+    print_step "Clonage du repository..."
+    sudo -H -u "$DEPLOY_USER" git clone "$REPO_URL" "$APP_DIR"
+    print_success "Repository cloné"
+  fi
+
+  chown -R "$DEPLOY_USER":"$DEPLOY_USER" "$APP_DIR"
+}
+
 configure_env() {
-    print_step "Configuration de l'environnement..."
-
-    if [[ -f "${APP_DIR}/.env" ]]; then
-        print_warning "Fichier .env existant trouvé"
-        read -p "Voulez-vous le remplacer? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_success "Fichier .env conservé"
-            return
-        fi
+  print_step "Configuration de l'environnement..."
+  if [[ -f "${APP_DIR}/.env" ]]; then
+    print_warning ".env existe déjà"
+    read -r -p "Le remplacer ? (y/N): " -n 1 REPLY || true; echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      print_success ".env conservé"
+      return
     fi
+  fi
 
-    echo -e "\n${YELLOW}Configuration de l'application:${NC}"
+  read -r -p "JWT_SECRET (vide = auto): " JWT_SECRET || true
+  if [[ -z "${JWT_SECRET:-}" ]]; then
+    JWT_SECRET="$(openssl rand -base64 32)"
+    print_success "JWT_SECRET généré"
+  fi
 
-    # JWT Secret
-    read -p "JWT_SECRET (laisser vide pour générer automatiquement): " JWT_SECRET
-    if [[ -z "$JWT_SECRET" ]]; then
-        JWT_SECRET=$(openssl rand -base64 32)
-        print_success "JWT_SECRET généré automatiquement"
-    fi
+  read -r -p "Port app (défaut 3000): " APP_PORT || true
+  APP_PORT="${APP_PORT:-3000}"
+  read -r -p "Nom de domaine (ex: baienevole.com): " DOMAIN || true
 
-    # Port
-    read -p "Port de l'application (défaut: 3000): " APP_PORT
-    APP_PORT=${APP_PORT:-3000}
+  read -r -p "SMTP Host: " SMTP_HOST || true
+  read -r -p "SMTP Port (défaut 587): " SMTP_PORT || true
+  SMTP_PORT="${SMTP_PORT:-587}"
+  read -r -p "SMTP User: " SMTP_USER || true
+  read -r -p "SMTP Password: " -s SMTP_PASS || true; echo
+  read -r -p "Email expéditeur (ex: noreply@${DOMAIN}): " SMTP_FROM || true
 
-    # Domaine
-    read -p "Nom de domaine (ex: baienevole.com): " DOMAIN
+  local FRONTEND_URL="http://localhost:${APP_PORT}"
+  [[ -n "${DOMAIN:-}" ]] && FRONTEND_URL="https://${DOMAIN}"
 
-    # Configuration SMTP
-    echo -e "\n${YELLOW}Configuration SMTP pour les emails:${NC}"
-    read -p "SMTP Host (ex: smtp.gmail.com): " SMTP_HOST
-    read -p "SMTP Port (défaut: 587): " SMTP_PORT
-    SMTP_PORT=${SMTP_PORT:-587}
-    read -p "SMTP User: " SMTP_USER
-    read -sp "SMTP Password: " SMTP_PASS
-    echo
-    read -p "Email expéditeur (ex: noreply@${DOMAIN}): " SMTP_FROM
-
-    # URL Frontend
-    FRONTEND_URL="https://${DOMAIN}"
-    if [[ -z "$DOMAIN" ]]; then
-        FRONTEND_URL="http://localhost:${APP_PORT}"
-    fi
-
-    # Créer le fichier .env
-    cat > "${APP_DIR}/.env" <<EOF
-# Environnement
+  install -m 600 -o "$DEPLOY_USER" -g "$DEPLOY_USER" /dev/null "${APP_DIR}/.env"
+  cat > "${APP_DIR}/.env" <<EOF
 NODE_ENV=production
 PORT=${APP_PORT}
-
-# Base de données
 DATABASE_URL="file:./prisma/prod.db"
-
-# JWT
 JWT_SECRET=${JWT_SECRET}
-
-# SMTP Configuration
 SMTP_HOST=${SMTP_HOST}
 SMTP_PORT=${SMTP_PORT}
 SMTP_USER=${SMTP_USER}
 SMTP_PASS=${SMTP_PASS}
 SMTP_FROM="${SMTP_FROM}"
-
-# Frontend URL
 FRONTEND_URL=${FRONTEND_URL}
 EOF
 
-    chmod 600 "${APP_DIR}/.env"
-    print_success "Fichier .env créé"
+  print_success ".env écrit"
 }
 
-# Clone ou mise à jour du repository
-setup_repository() {
-    print_step "Configuration du repository..."
-
-    if [[ -d "$APP_DIR" ]]; then
-        print_warning "Répertoire $APP_DIR existe déjà"
-        read -p "Voulez-vous faire une mise à jour (pull)? (Y/n): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Nn]$ ]]; then
-            print_warning "Déploiement annulé"
-            exit 0
-        fi
-
-        cd "$APP_DIR"
-        git fetch origin
-        git pull origin main
-        print_success "Repository mis à jour"
-    else
-        print_step "Clonage du repository..."
-        mkdir -p "$APP_DIR"
-        git clone "$REPO_URL" "$APP_DIR"
-        cd "$APP_DIR"
-        print_success "Repository cloné"
-    fi
-}
-
-# Installation des dépendances
 install_dependencies() {
-    print_step "Installation des dépendances..."
+  print_step "Installation des dépendances..."
 
-    cd "$APP_DIR"
+  # Backend deps
+  print_step "Backend deps..."
+  sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR' && npm ci --omit=dev || npm install --production"
+  print_success "Dépendances backend OK"
 
-    # Backend
-    print_step "Installation des dépendances backend..."
-    npm install --production
-    print_success "Dépendances backend installées"
-
-    # Frontend
-    print_step "Installation des dépendances frontend..."
-    cd client
-    npm install
-    print_success "Dépendances frontend installées"
-
-    cd "$APP_DIR"
+  # Frontend deps
+  if [[ -d "$APP_DIR/client" ]]; then
+    print_step "Frontend deps..."
+    sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR/client' && npm ci || npm install"
+    print_success "Dépendances frontend OK"
+  fi
 }
 
-# Configuration de la base de données
 setup_database() {
-    print_step "Configuration de la base de données..."
-
-    cd "$APP_DIR"
-
-    # Générer le client Prisma
-    npx prisma generate
-    print_success "Client Prisma généré"
-
-    # Créer/migrer la base de données
-    if [[ ! -f "prisma/prod.db" ]]; then
-        print_step "Création de la base de données..."
-        npx prisma db push
-        print_success "Base de données créée"
-
-        # Demander si on veut des données de démo
-        read -p "Voulez-vous ajouter des données de démonstration? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            npm run db:seed
-            print_success "Données de démo ajoutées"
-        fi
-    else
-        print_warning "Base de données existante détectée"
-        read -p "Voulez-vous appliquer les migrations? (Y/n): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            npx prisma db push
-            print_success "Migrations appliquées"
-        fi
-    fi
+  print_step "Configuration base de données (Prisma)..."
+  sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR' && npx prisma generate"
+  if [[ ! -f "$APP_DIR/prisma/prod.db" ]]; then
+    print_step "Création DB..."
+    sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR' && npx prisma db push"
+    print_success "DB créée"
+  else
+    print_step "Migrations..."
+    sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR' && npx prisma db push"
+    print_success "Migrations appliquées"
+  fi
 }
 
-# Build du frontend
 build_frontend() {
-    print_step "Build du frontend..."
-
-    cd "$APP_DIR/client"
-    npm run build
+  if [[ -d "$APP_DIR/client" ]]; then
+    print_step "Build frontend..."
+    sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR/client' && npm run build"
     print_success "Frontend buildé"
-
-    cd "$APP_DIR"
+  fi
 }
 
-# Configuration PM2
 setup_pm2() {
-    print_step "Configuration de PM2..."
+  print_step "Configuration PM2..."
 
-    cd "$APP_DIR"
+  # Ensure logs dir
+  mkdir -p "${APP_DIR}/logs"
+  chown -R "$DEPLOY_USER":"$DEPLOY_USER" "${APP_DIR}/logs"
 
-    # Arrêter l'application si elle tourne
-    if pm2 list | grep -q "$APP_NAME"; then
-        print_step "Arrêt de l'application existante..."
-        pm2 delete "$APP_NAME" || true
-    fi
+  # Ensure ecosystem file exists
+  if [[ ! -f "${APP_DIR}/ecosystem.config.js" ]]; then
+    cat > "${APP_DIR}/ecosystem.config.js" <<'EOF'
+module.exports = {
+  apps: [
+    {
+      name: "baienevole",
+      script: "server.js",
+      cwd: __dirname,
+      env: { NODE_ENV: "production", PORT: process.env.PORT || 3000 },
+      error_file: "logs/err.log",
+      out_file: "logs/out.log",
+      time: true,
+      instances: 1,
+      exec_mode: "fork",
+    },
+  ],
+};
+EOF
+    chown "$DEPLOY_USER":"$DEPLOY_USER" "${APP_DIR}/ecosystem.config.js"
+    print_success "ecosystem.config.js créé"
+  fi
 
-    # Démarrer l'application
-    pm2 start ecosystem.config.js --env production
+  # Stop/remove existing app if any
+  sudo -H -u "$DEPLOY_USER" bash -lc "'$PM2' list | grep -q '${APP_NAME}' && '$PM2' delete '${APP_NAME}' || true"
 
-    # Sauvegarder la configuration PM2
-    pm2 save
+  # Start app
+  sudo -H -u "$DEPLOY_USER" bash -lc "cd '$APP_DIR' && '$PM2' start ecosystem.config.js --only '${APP_NAME}' --env production"
+  sudo -H -u "$DEPLOY_USER" bash -lc "'$PM2' save"
 
-    # Configurer le démarrage automatique
-    pm2 startup systemd -u root --hp /root
-
-    print_success "Application démarrée avec PM2"
+  # Startup on boot for DEPLOY_USER
+  # We pass the user's home to pm2 so it persists under the right $HOME
+  sudo -H -u "$DEPLOY_USER" bash -lc "'$PM2' startup systemd -u '${DEPLOY_USER}' --hp '${DEPLOY_HOME}'"
+  print_success "Application démarrée via PM2 (user: ${DEPLOY_USER})"
 }
 
-# Configuration Nginx
 setup_nginx() {
-    print_step "Configuration de Nginx..."
+  print_step "Configuration Nginx..."
+  if [[ -z "${DOMAIN:-}" ]]; then
+    print_warning "Pas de domaine, Nginx non configuré (l'app écoute sur le port)."
+    return
+  fi
 
-    if [[ -z "$DOMAIN" ]]; then
-        print_warning "Pas de domaine configuré, Nginx non configuré"
-        print_warning "L'application est accessible sur http://localhost:${APP_PORT}"
-        return
-    fi
-
-    # Créer la configuration Nginx
-    cat > "$NGINX_CONF" <<EOF
+  cat > "$NGINX_CONF" <<EOF
 server {
     listen 80;
     server_name ${DOMAIN} www.${DOMAIN};
-
-    # Redirection vers HTTPS (si certificat SSL configuré)
-    # return 301 https://\$server_name\$request_uri;
 
     location / {
         proxy_pass http://localhost:${APP_PORT};
@@ -404,163 +349,87 @@ server {
         proxy_cache_bypass \$http_upgrade;
     }
 
-    # Logs
     access_log /var/log/nginx/${APP_NAME}_access.log;
-    error_log /var/log/nginx/${APP_NAME}_error.log;
+    error_log  /var/log/nginx/${APP_NAME}_error.log;
 }
 EOF
 
-    # Activer le site
-    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/
-
-    # Tester la configuration
-    if nginx -t; then
-        systemctl reload nginx
-        print_success "Nginx configuré et rechargé"
-    else
-        print_error "Erreur dans la configuration Nginx"
-        return 1
-    fi
-
-    # Proposer l'installation de SSL
-    print_step "Configuration SSL avec Let's Encrypt"
-    read -p "Voulez-vous installer un certificat SSL (Let's Encrypt)? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if ! command -v certbot &> /dev/null; then
-            apt-get install -y certbot python3-certbot-nginx
-        fi
-
-        certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN"
-        print_success "Certificat SSL installé"
-    fi
+  ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/
+  nginx -t
+  systemctl reload nginx
+  print_success "Nginx configuré et rechargé"
 }
 
-# Configuration du cron pour les backups
 setup_backup_cron() {
-    print_step "Configuration des backups automatiques..."
+  print_step "Configuration backups..."
+  mkdir -p "${APP_DIR}/backups" "${APP_DIR}/scripts" "${APP_DIR}/logs"
+  chown -R "$DEPLOY_USER":"$DEPLOY_USER" "${APP_DIR}/backups" "${APP_DIR}/scripts" "${APP_DIR}/logs"
 
-    # Créer le dossier de backups
-    mkdir -p "${APP_DIR}/backups"
-
-    # Vérifier si le cron existe déjà
-    if crontab -l 2>/dev/null | grep -q "${APP_DIR}/scripts/backup.sh"; then
-        print_warning "Cron de backup déjà configuré"
-        return
-    fi
-
-    read -p "Voulez-vous configurer les backups automatiques quotidiens? (Y/n): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        # Rendre le script de backup exécutable
-        chmod +x "${APP_DIR}/scripts/backup.sh"
-
-        # Ajouter au crontab (tous les jours à 2h00)
-        (crontab -l 2>/dev/null; echo "0 2 * * * ${APP_DIR}/scripts/backup.sh >> ${APP_DIR}/logs/backup.log 2>&1") | crontab -
-
-        print_success "Backup automatique configuré (tous les jours à 2h00)"
-    fi
-}
-
-# Configuration du cron pour les rappels email
-setup_reminders_cron() {
-    print_step "Configuration des rappels email automatiques..."
-
-    # Vérifier si le cron existe déjà
-    if crontab -l 2>/dev/null | grep -q "reminders:send"; then
-        print_warning "Cron de rappels déjà configuré"
-        return
-    fi
-
-    read -p "Voulez-vous configurer les rappels email automatiques? (Y/n): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        # Ajouter au crontab (tous les jours à 10h00)
-        (crontab -l 2>/dev/null; echo "0 10 * * * cd ${APP_DIR} && npm run reminders:send >> ${APP_DIR}/logs/reminders.log 2>&1") | crontab -
-
-        print_success "Rappels email configurés (tous les jours à 10h00)"
-    fi
-}
-
-# Afficher les informations finales
-show_summary() {
-    echo -e "\n${GREEN}========================================${NC}"
-    echo -e "${GREEN}  Déploiement terminé avec succès! 🎉${NC}"
-    echo -e "${GREEN}========================================${NC}\n"
-
-    echo -e "${BLUE}Informations de l'application:${NC}"
-    echo -e "  📁 Répertoire: ${APP_DIR}"
-    echo -e "  🚀 Port: ${APP_PORT}"
-
-    if [[ -n "$DOMAIN" ]]; then
-        echo -e "  🌐 URL: https://${DOMAIN}"
+  if ! crontab -l -u "$DEPLOY_USER" 2>/dev/null | grep -q "${APP_DIR}/scripts/backup.sh"; then
+    if [[ -f "${APP_DIR}/scripts/backup.sh" ]]; then
+      chmod +x "${APP_DIR}/scripts/backup.sh"
+      (crontab -l -u "$DEPLOY_USER" 2>/dev/null; echo "0 2 * * * ${APP_DIR}/scripts/backup.sh >> ${APP_DIR}/logs/backup.log 2>&1") | crontab -u "$DEPLOY_USER" -
+      print_success "Backup quotidien (2h00) configuré pour ${DEPLOY_USER}"
     else
-        echo -e "  🌐 URL: http://localhost:${APP_PORT}"
+      print_warning "scripts/backup.sh introuvable, cron non ajouté."
     fi
-
-    echo -e "\n${BLUE}Commandes utiles:${NC}"
-    echo -e "  pm2 status              # Voir l'état de l'application"
-    echo -e "  pm2 logs ${APP_NAME}       # Voir les logs"
-    echo -e "  pm2 restart ${APP_NAME}    # Redémarrer l'application"
-    echo -e "  pm2 stop ${APP_NAME}       # Arrêter l'application"
-    echo -e "  pm2 monit               # Monitoring en temps réel"
-
-    echo -e "\n${BLUE}Documentation:${NC}"
-    echo -e "  📚 API Docs: http://localhost:${APP_PORT}/api-docs"
-    echo -e "  📖 Guide de déploiement: ${APP_DIR}/DEPLOYMENT.md"
-    echo -e "  🤝 Guide de contribution: ${APP_DIR}/CONTRIBUTING.md"
-
-    echo -e "\n${BLUE}Logs:${NC}"
-    echo -e "  Backend: ${APP_DIR}/logs/out.log"
-    echo -e "  Erreurs: ${APP_DIR}/logs/err.log"
-    echo -e "  Nginx: /var/log/nginx/${APP_NAME}_*.log"
-
-    if crontab -l 2>/dev/null | grep -q "backup.sh"; then
-        echo -e "\n${BLUE}Backups:${NC}"
-        echo -e "  📦 Dossier: ${APP_DIR}/backups"
-        echo -e "  ⏰ Fréquence: Quotidien à 2h00"
-        echo -e "  🔄 Rétention: 30 jours"
-    fi
-
-    if crontab -l 2>/dev/null | grep -q "reminders:send"; then
-        echo -e "\n${BLUE}Rappels email:${NC}"
-        echo -e "  ✉️  Fréquence: Quotidien à 10h00"
-        echo -e "  📝 Logs: ${APP_DIR}/logs/reminders.log"
-    fi
-
-    echo ""
+  else
+    print_warning "Cron de backup déjà présent"
+  fi
 }
 
-# Point d'entrée principal
+setup_reminders_cron() {
+  print_step "Configuration rappels email..."
+  if ! crontab -l -u "$DEPLOY_USER" 2>/dev/null | grep -q "reminders:send"; then
+    (crontab -l -u "$DEPLOY_USER" 2>/dev/null; echo "0 10 * * * cd ${APP_DIR} && npm run reminders:send >> ${APP_DIR}/logs/reminders.log 2>&1") | crontab -u "$DEPLOY_USER" -
+    print_success "Rappels quotidiens (10h00) configurés"
+  else
+    print_warning "Cron de rappels déjà présent"
+  fi
+}
+
+show_summary() {
+  echo -e "\n${GREEN}========================================${NC}"
+  echo -e "${GREEN}  Déploiement terminé avec succès! 🎉${NC}"
+  echo -e "${GREEN}========================================${NC}\n"
+
+  echo -e "${BLUE}Infos:${NC}"
+  echo -e "  📁 Répertoire: ${APP_DIR}"
+  echo -e "  👤 User PM2:   ${DEPLOY_USER}"
+  echo -e "  🚀 Port:       ${APP_PORT}"
+  if [[ -n "${DOMAIN:-}" ]]; then
+    echo -e "  🌐 URL:        https://${DOMAIN}"
+  else
+    echo -e "  🌐 URL:        http://localhost:${APP_PORT}"
+  fi
+
+  echo -e "\n${BLUE}Commandes utiles:${NC}"
+  echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} status"
+  echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} logs ${APP_NAME}"
+  echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} restart ${APP_NAME}"
+}
+
 main() {
-    echo -e "${GREEN}"
-    echo "╔════════════════════════════════════════════╗"
-    echo "║   Déploiement Production - Baie des Singes ║"
-    echo "║        Plateforme de Gestion Bénévoles     ║"
-    echo "╚════════════════════════════════════════════╝"
-    echo -e "${NC}\n"
+  echo -e "${GREEN}"
+  echo "╔════════════════════════════════════════════╗"
+  echo "║   Déploiement Production - Baie des Singes ║"
+  echo "║        Plateforme de Gestion Bénévoles     ║"
+  echo "╚════════════════════════════════════════════╝"
+  echo -e "${NC}\n"
 
-    # Vérifications
-    check_root
-    check_prerequisites
-
-    # Configuration initiale
-    configure_installation
-
-    # Déploiement
-    setup_repository
-    configure_env
-    install_dependencies
-    setup_database
-    build_frontend
-    setup_pm2
-    setup_nginx
-    setup_backup_cron
-    setup_reminders_cron
-
-    # Résumé
-    show_summary
+  require_root
+  check_prerequisites
+  configure_installation
+  setup_repository
+  configure_env
+  install_dependencies
+  setup_database
+  build_frontend
+  setup_pm2
+  setup_nginx
+  setup_backup_cron
+  setup_reminders_cron
+  show_summary
 }
 
-# Exécution
 main "$@"
