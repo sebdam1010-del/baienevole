@@ -77,26 +77,42 @@ sudo bash deploy.sh
 
 Le script vous guidera interactivement à travers toutes les étapes de configuration :
 
-1. **JWT Secret** : Généré automatiquement ou fourni manuellement
-2. **Port** : Port de l'application (défaut: 3000)
-3. **Domaine** : Nom de domaine pour Nginx et SSL
-4. **SMTP** : Configuration email pour les notifications
-5. **SSL** : Installation optionnelle de Let's Encrypt
-6. **Backups** : Configuration des sauvegardes automatiques
-7. **Rappels** : Configuration des emails de rappel
+1. **Dossier d'installation** : Où installer l'application (défaut: `/var/www/baienevole`)
+2. **Méthode Git** : HTTPS (simple) ou SSH (avec clé)
+   - **HTTPS** : Aucune configuration requise
+   - **SSH** : Le script peut lister vos clés existantes ou en générer une nouvelle
+3. **JWT Secret** : Généré automatiquement ou fourni manuellement
+4. **Port** : Port de l'application (défaut: 3000)
+5. **Domaine** : Nom de domaine pour Nginx et SSL
+6. **SMTP** : Configuration email pour les notifications
+7. **SSL** : Installation optionnelle de Let's Encrypt
+8. **Backups** : Configuration des sauvegardes automatiques
+9. **Rappels** : Configuration des emails de rappel
+
+### Clés SSH
+
+Si vous choisissez SSH, le script :
+- Liste les clés SSH disponibles dans `~/.ssh/`
+- Vous permet de spécifier une clé existante ou d'en générer une nouvelle
+- Teste automatiquement la connexion à GitHub
+- Affiche la clé publique à ajouter sur GitHub si nécessaire
 
 ### Configuration personnalisée
 
-Vous pouvez éditer le script avant de l'exécuter pour modifier les valeurs par défaut :
+Si vous préférez un déploiement non-interactif, vous pouvez éditer le script avant de l'exécuter :
 
 ```bash
-# Configuration
+# Configuration par défaut
 APP_NAME="baienevole"
-APP_DIR="/var/www/baienevole"              # Chemin d'installation
-REPO_URL="git@github.com:sebdam1010-del/baienevole.git"
+DEFAULT_APP_DIR="/var/www/baienevole"      # Dossier par défaut
+REPO_URL="https://github.com/sebdam1010-del/baienevole.git"
 NODE_VERSION="18"                           # Version Node.js
-NGINX_CONF="/etc/nginx/sites-available/baienevole"
 ```
+
+Le script vous demandera :
+- Le dossier d'installation exact (peut être différent du défaut)
+- La méthode Git (HTTPS ou SSH avec quelle clé)
+- Tous les paramètres de configuration (.env, SMTP, etc.)
 
 ### Après le déploiement
 

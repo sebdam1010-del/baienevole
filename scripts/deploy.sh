@@ -14,12 +14,16 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Configuration
+# Configuration par défaut
 APP_NAME="baienevole"
-APP_DIR="/var/www/baienevole"
-REPO_URL="git@github.com:sebdam1010-del/baienevole.git"
+DEFAULT_APP_DIR="/var/www/baienevole"
+REPO_URL="https://github.com/sebdam1010-del/baienevole.git"
 NODE_VERSION="18"
 NGINX_CONF="/etc/nginx/sites-available/baienevole"
+
+# Variables qui seront définies par l'utilisateur
+APP_DIR=""
+USE_SSH=false
 
 # Fonction d'affichage
 print_step() {
@@ -93,6 +97,92 @@ check_prerequisites() {
         apt-get install -y git
     fi
     print_success "Git installé"
+}
+
+# Demander le dossier d'installation et la méthode Git
+configure_installation() {
+    print_step "Configuration de l'installation..."
+
+    echo -e "\n${YELLOW}Dossier d'installation:${NC}"
+    read -p "Où voulez-vous installer l'application? (défaut: ${DEFAULT_APP_DIR}): " APP_DIR
+    APP_DIR=${APP_DIR:-$DEFAULT_APP_DIR}
+
+    # Créer le dossier parent si nécessaire
+    PARENT_DIR=$(dirname "$APP_DIR")
+    if [[ ! -d "$PARENT_DIR" ]]; then
+        print_warning "Le dossier parent ${PARENT_DIR} n'existe pas"
+        read -p "Voulez-vous le créer? (Y/n): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            mkdir -p "$PARENT_DIR"
+            print_success "Dossier parent créé"
+        else
+            print_error "Installation annulée"
+            exit 1
+        fi
+    fi
+
+    print_success "Dossier d'installation: ${APP_DIR}"
+
+    # Demander la méthode de connexion Git
+    echo -e "\n${YELLOW}Configuration Git:${NC}"
+    echo "Comment voulez-vous cloner le repository?"
+    echo "  1) HTTPS (simple, pas de clé SSH requise)"
+    echo "  2) SSH (nécessite une clé SSH configurée)"
+    read -p "Votre choix (1/2, défaut: 1): " GIT_METHOD
+    GIT_METHOD=${GIT_METHOD:-1}
+
+    if [[ "$GIT_METHOD" == "2" ]]; then
+        USE_SSH=true
+        REPO_URL="git@github.com:sebdam1010-del/baienevole.git"
+
+        echo -e "\n${YELLOW}Configuration de la clé SSH:${NC}"
+        echo "Clés SSH disponibles:"
+        ls -1 ~/.ssh/*.pub 2>/dev/null | sed 's/\.pub$//' || echo "  Aucune clé SSH trouvée"
+
+        read -p "Chemin vers votre clé SSH privée (défaut: ~/.ssh/id_rsa): " SSH_KEY
+        SSH_KEY=${SSH_KEY:-~/.ssh/id_rsa}
+
+        # Vérifier que la clé existe
+        if [[ ! -f "$SSH_KEY" ]]; then
+            print_error "La clé SSH ${SSH_KEY} n'existe pas"
+            read -p "Voulez-vous générer une nouvelle clé SSH? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                read -p "Email pour la clé SSH: " SSH_EMAIL
+                ssh-keygen -t ed25519 -C "$SSH_EMAIL" -f "$SSH_KEY"
+                print_success "Clé SSH générée: ${SSH_KEY}"
+                print_warning "IMPORTANT: Ajoutez cette clé publique à votre compte GitHub:"
+                echo -e "\n${BLUE}$(cat ${SSH_KEY}.pub)${NC}\n"
+                print_warning "1. Allez sur https://github.com/settings/keys"
+                print_warning "2. Cliquez sur 'New SSH key'"
+                print_warning "3. Collez la clé ci-dessus"
+                read -p "Appuyez sur Entrée une fois la clé ajoutée sur GitHub..."
+            else
+                print_error "Installation annulée"
+                exit 1
+            fi
+        fi
+
+        # Configurer SSH pour utiliser la clé
+        export GIT_SSH_COMMAND="ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no"
+        print_success "Utilisation de la clé SSH: ${SSH_KEY}"
+
+        # Tester la connexion SSH
+        print_step "Test de la connexion SSH à GitHub..."
+        if ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+            print_success "Connexion SSH à GitHub réussie"
+        else
+            print_warning "Impossible de vérifier la connexion SSH"
+            print_warning "Si le clone échoue, vérifiez que la clé est bien ajoutée sur GitHub"
+        fi
+    else
+        REPO_URL="https://github.com/sebdam1010-del/baienevole.git"
+        print_success "Utilisation de HTTPS pour cloner le repository"
+    fi
+
+    # Mettre à jour le chemin de configuration Nginx
+    NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
 }
 
 # Demander les informations de configuration
@@ -453,6 +543,9 @@ main() {
     # Vérifications
     check_root
     check_prerequisites
+
+    # Configuration initiale
+    configure_installation
 
     # Déploiement
     setup_repository
