@@ -214,21 +214,28 @@ const Events = () => {
     )].sort((a, b) => b - a);
   }, [events]);
 
-  // Trouver l'index de l'événement de la semaine en cours (premier événement futur ou plus récent)
+  // Trouver l'index de l'événement de la semaine en cours
+  // Les événements sont triés par date décroissante (du plus récent au plus ancien)
   const currentWeekEventIndex = useMemo(() => {
     if (filteredEvents.length === 0) return -1;
 
     const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    now.setHours(0, 0, 0, 0); // Minuit aujourd'hui
 
-    // Chercher le premier événement futur ou dans la semaine passée
-    const index = filteredEvents.findIndex(event => {
-      const eventDate = new Date(event.date);
-      return eventDate >= oneWeekAgo;
-    });
+    // Chercher le dernier événement futur (le plus proche de maintenant)
+    // On parcourt de la fin vers le début car les événements sont en ordre décroissant
+    for (let i = filteredEvents.length - 1; i >= 0; i--) {
+      const eventDate = new Date(filteredEvents[i].date);
+      eventDate.setHours(0, 0, 0, 0);
 
-    // Si aucun événement futur, retourner le dernier événement
-    return index >= 0 ? index : filteredEvents.length - 1;
+      // Si l'événement est aujourd'hui ou dans le futur
+      if (eventDate >= now) {
+        return i;
+      }
+    }
+
+    // Si tous les événements sont passés, retourner le premier (le plus récent des événements passés)
+    return 0;
   }, [filteredEvents]);
 
   return (
