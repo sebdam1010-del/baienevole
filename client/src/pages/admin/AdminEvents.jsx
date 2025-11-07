@@ -21,6 +21,7 @@ const AdminEvents = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [currentEvent, setCurrentEvent] = useState(null);
   const [selectedEventForRegistrations, setSelectedEventForRegistrations] = useState(null);
+  const [modalError, setModalError] = useState('');
 
   // Form data
   const [eventFormData, setEventFormData] = useState({
@@ -33,6 +34,9 @@ const AdminEvents = () => {
     nombreSpectatursAttendus: 0,
     description: '',
     commentaires: '',
+    imageUrl: '',
+    tarif: '',
+    urlSite: '',
   });
 
   // Statistics
@@ -154,7 +158,11 @@ const AdminEvents = () => {
       nombreSpectatursAttendus: 0,
       description: '',
       commentaires: '',
+      imageUrl: '',
+      tarif: '',
+      urlSite: '',
     });
+    setModalError('');
     setIsEventModalOpen(true);
   };
 
@@ -170,7 +178,11 @@ const AdminEvents = () => {
       nombreSpectatursAttendus: event.nombreSpectatursAttendus || 0,
       description: event.description || '',
       commentaires: event.commentaires || '',
+      imageUrl: event.imageUrl || '',
+      tarif: event.tarif || '',
+      urlSite: event.urlSite || '',
     });
+    setModalError('');
     setIsEventModalOpen(true);
   };
 
@@ -181,6 +193,8 @@ const AdminEvents = () => {
 
   const handleSubmitEvent = async (e) => {
     e.preventDefault();
+    setModalError('');
+
     try {
       if (currentEvent) {
         // Update
@@ -190,9 +204,12 @@ const AdminEvents = () => {
         await api.post('/events', eventFormData);
       }
       setIsEventModalOpen(false);
+      setModalError('');
       fetchEvents();
     } catch (err) {
-      setError(err.response?.data?.error || 'Erreur lors de la sauvegarde');
+      const errorMessage = err.response?.data?.error || 'Erreur lors de la sauvegarde de l\'événement';
+      setModalError(errorMessage);
+      console.error('Erreur lors de la sauvegarde:', err);
     }
   };
 
@@ -459,6 +476,16 @@ const AdminEvents = () => {
           </>
         }
       >
+        {modalError && (
+          <div className="mb-4 p-3 rounded border text-sm" style={{
+            backgroundColor: '#FEE2E2',
+            borderColor: 'var(--color-baie-red)',
+            color: 'var(--color-baie-red)',
+          }}>
+            {modalError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmitEvent} className="space-y-4">
           <Input
             label="Nom de l'événement"
@@ -530,6 +557,34 @@ const AdminEvents = () => {
             onChange={handleEventFormChange}
             min="0"
             helperText="Optionnel"
+          />
+
+          <Input
+            label="URL de l'image"
+            name="imageUrl"
+            value={eventFormData.imageUrl}
+            onChange={handleEventFormChange}
+            placeholder="https://example.com/image.jpg ou /images/events/photo.jpg"
+            helperText="Optionnel - URL complète ou chemin relatif"
+          />
+
+          <Input
+            label="Tarif"
+            name="tarif"
+            value={eventFormData.tarif}
+            onChange={handleEventFormChange}
+            placeholder="Ex: Gratuit, 10€, 5-15€..."
+            helperText="Optionnel - Prix du billet"
+          />
+
+          <Input
+            label="URL du site officiel"
+            name="urlSite"
+            type="url"
+            value={eventFormData.urlSite}
+            onChange={handleEventFormChange}
+            placeholder="https://baiedessinges.com/evenement/..."
+            helperText="Optionnel - Lien vers la page de l'événement"
           />
 
           <RichTextEditor
