@@ -41,7 +41,104 @@ Ce guide explique comment déployer la plateforme de gestion des bénévoles de 
 
 Voir le [README.md](./README.md) pour les instructions de développement local.
 
-## Déploiement sur serveur VPS
+## 🚀 Déploiement automatique (Recommandé)
+
+**Le moyen le plus rapide et sûr de déployer l'application en production.**
+
+Un script de déploiement automatisé (`scripts/deploy.sh`) est fourni pour simplifier et sécuriser le déploiement. Il gère automatiquement :
+
+- ✅ Vérification et installation des prérequis (Node.js, PM2, Nginx, Git)
+- ✅ Clone ou mise à jour du repository
+- ✅ Configuration interactive de l'environnement (.env)
+- ✅ Installation des dépendances backend et frontend
+- ✅ Configuration et migration de la base de données
+- ✅ Build du frontend
+- ✅ Configuration de PM2 (gestionnaire de processus)
+- ✅ Configuration de Nginx (reverse proxy)
+- ✅ Configuration optionnelle de SSL (Let's Encrypt)
+- ✅ Configuration des backups automatiques (quotidiens à 2h)
+- ✅ Configuration des rappels email (quotidiens à 10h)
+
+### Utilisation
+
+```bash
+# 1. Se connecter au serveur en SSH
+ssh user@votre-serveur.com
+
+# 2. Télécharger le script de déploiement
+curl -O https://raw.githubusercontent.com/sebdam1010-del/baienevole/main/scripts/deploy.sh
+
+# 3. Rendre le script exécutable
+chmod +x deploy.sh
+
+# 4. Lancer le déploiement (nécessite sudo)
+sudo bash deploy.sh
+```
+
+Le script vous guidera interactivement à travers toutes les étapes de configuration :
+
+1. **JWT Secret** : Généré automatiquement ou fourni manuellement
+2. **Port** : Port de l'application (défaut: 3000)
+3. **Domaine** : Nom de domaine pour Nginx et SSL
+4. **SMTP** : Configuration email pour les notifications
+5. **SSL** : Installation optionnelle de Let's Encrypt
+6. **Backups** : Configuration des sauvegardes automatiques
+7. **Rappels** : Configuration des emails de rappel
+
+### Configuration personnalisée
+
+Vous pouvez éditer le script avant de l'exécuter pour modifier les valeurs par défaut :
+
+```bash
+# Configuration
+APP_NAME="baienevole"
+APP_DIR="/var/www/baienevole"              # Chemin d'installation
+REPO_URL="git@github.com:sebdam1010-del/baienevole.git"
+NODE_VERSION="18"                           # Version Node.js
+NGINX_CONF="/etc/nginx/sites-available/baienevole"
+```
+
+### Après le déploiement
+
+Le script affiche un résumé complet avec :
+- URL d'accès à l'application
+- Commandes PM2 utiles
+- Emplacement des logs
+- Configuration des backups et rappels
+
+```bash
+# Commandes utiles après déploiement
+pm2 status              # Voir l'état de l'application
+pm2 logs baienevole     # Voir les logs en temps réel
+pm2 restart baienevole  # Redémarrer l'application
+pm2 stop baienevole     # Arrêter l'application
+pm2 monit               # Monitoring en temps réel
+```
+
+### Mise à jour de l'application
+
+Pour mettre à jour l'application déployée :
+
+```bash
+# Relancer le script de déploiement
+sudo bash deploy.sh
+
+# Le script détectera l'installation existante et proposera de :
+# - Faire un git pull (mise à jour du code)
+# - Conserver ou remplacer le fichier .env
+# - Appliquer les migrations de base de données
+# - Redémarrer l'application avec PM2
+```
+
+### En cas de problème
+
+Si le déploiement automatique échoue, vous pouvez :
+
+1. Consulter les logs : `tail -f /var/log/nginx/baienevole_error.log`
+2. Vérifier PM2 : `pm2 logs baienevole --lines 50`
+3. Suivre le [déploiement manuel](#déploiement-sur-serveur-vps) ci-dessous
+
+## Déploiement sur serveur VPS (Manuel)
 
 ### 1. Préparation du serveur
 
