@@ -88,8 +88,8 @@ const Events = () => {
 
       setError('');
     } catch (err) {
-      // Ignore abort errors (they're expected when component unmounts)
-      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+      // Ignore abort errors (they're expected when component unmounts or dependencies change)
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED' || err.code === 'ECONNABORTED') {
         return;
       }
       setError('Erreur lors du chargement des événements');
