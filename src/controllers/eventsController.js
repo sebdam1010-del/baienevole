@@ -152,10 +152,11 @@ exports.getAllEvents = async (req, res) => {
       };
     }
 
-    // Pagination parameters
-    const pageNumber = page ? parseInt(page) : 1;
-    const pageSize = limit ? parseInt(limit) : 100; // Default 100 items per page
-    const skip = (pageNumber - 1) * pageSize;
+    // Pagination parameters (optionnelle)
+    const pageNumber = page ? parseInt(page) : null;
+    const pageSize = limit ? parseInt(limit) : null;
+    const skip = (pageNumber && pageSize) ? (pageNumber - 1) * pageSize : undefined;
+    const take = pageSize || undefined;
 
     // Get total count for pagination metadata
     const totalCount = await db.event.count({ where });
@@ -166,7 +167,7 @@ exports.getAllEvents = async (req, res) => {
         date: 'desc',
       },
       skip,
-      take: pageSize,
+      take,
       include: {
         registrations: {
           include: {
@@ -194,18 +195,28 @@ exports.getAllEvents = async (req, res) => {
       };
     });
 
-    // Return paginated response
-    res.status(200).json({
-      events: eventsWithQuota,
-      pagination: {
-        page: pageNumber,
-        limit: pageSize,
-        totalCount,
-        totalPages: Math.ceil(totalCount / pageSize),
-        hasNextPage: pageNumber < Math.ceil(totalCount / pageSize),
-        hasPreviousPage: pageNumber > 1,
-      },
-    });
+    // Return paginated response (only if pagination params were provided)
+    if (pageNumber && pageSize) {
+      res.status(200).json({
+        events: eventsWithQuota,
+        pagination: {
+          page: pageNumber,
+          limit: pageSize,
+          totalCount,
+          totalPages: Math.ceil(totalCount / pageSize),
+          hasNextPage: pageNumber < Math.ceil(totalCount / pageSize),
+          hasPreviousPage: pageNumber > 1,
+        },
+      });
+    } else {
+      // Return all events without pagination
+      res.status(200).json({
+        events: eventsWithQuota,
+        pagination: {
+          totalCount,
+        },
+      });
+    }
   } catch (error) {
     console.error('Get all events error:', error);
     res.status(500).json({
