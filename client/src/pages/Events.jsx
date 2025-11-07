@@ -16,6 +16,14 @@ const Events = () => {
     annee: '',
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 100,
+    totalCount: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  });
   const currentWeekRef = useRef(null);
   const hasScrolled = useRef(false);
 
@@ -23,7 +31,7 @@ const Events = () => {
     const controller = new AbortController();
     fetchEvents(controller.signal);
     return () => controller.abort();
-  }, [filters]);
+  }, [filters, pagination.page]);
 
   // Scroll vers la semaine en cours lors du chargement initial
   useEffect(() => {
@@ -57,12 +65,27 @@ const Events = () => {
   const fetchEvents = async (signal) => {
     try {
       setLoading(true);
-      const params = {};
+      const params = {
+        page: pagination.page,
+        limit: pagination.limit,
+      };
       if (filters.saison) params.saison = filters.saison;
       if (filters.annee) params.annee = filters.annee;
 
       const response = await api.get('/events', { params, signal });
-      setEvents(response.data);
+
+      // Handle paginated response
+      if (response.data.events && response.data.pagination) {
+        setEvents(response.data.events);
+        setPagination(prev => ({
+          ...prev,
+          ...response.data.pagination,
+        }));
+      } else {
+        // Fallback for non-paginated response (backward compatibility)
+        setEvents(response.data);
+      }
+
       setError('');
     } catch (err) {
       // Ignore abort errors (they're expected when component unmounts)
@@ -79,6 +102,15 @@ const Events = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
+    // Reset to page 1 when filters change
+    setPagination(prev => ({ ...prev, page: 1 }));
+    hasScrolled.current = false; // Allow scroll to current week on filter change
+  };
+
+  const handlePageChange = (newPage) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+    hasScrolled.current = false; // Allow scroll to current week on page change
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const formatDate = (dateString) => {
@@ -462,6 +494,71 @@ const Events = () => {
             );
           })}
         </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && filteredEvents.length > 0 && pagination.totalPages > 1 && (
+        <Card>
+          <div className="flex items-center justify-between">
+            {/* Page Info */}
+            <div className="text-sm" style={{ color: 'var(--color-baie-navy)' }}>
+              Page {pagination.page} sur {pagination.totalPages}
+              <span className="ml-3 text-gray-600">
+                ({pagination.totalCount} événement{pagination.totalCount > 1 ? 's' : ''} au total)
+              </span>
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={!pagination.hasPreviousPage}
+              >
+                ← Précédent
+              </Button>
+
+              {/* Page Numbers */}
+              <div className="flex gap-1">
+                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                  // Show first page, current page -1, current page, current page +1, last page
+                  let pageNum;
+                  if (pagination.totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.totalPages - 2) {
+                    pageNum = pagination.totalPages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={pagination.page === pageNum ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={() => handlePageChange(pageNum)}
+                      className="min-w-[40px]"
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={!pagination.hasNextPage}
+              >
+                Suivant →
+              </Button>
+            </div>
+          </div>
+        </Card>
       )}
     </div>
   );

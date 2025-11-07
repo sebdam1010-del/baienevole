@@ -137,7 +137,7 @@ exports.createEvent = async (req, res) => {
 // READ ALL - GET /api/events
 exports.getAllEvents = async (req, res) => {
   try {
-    const { saison, annee } = req.query;
+    const { saison, annee, page, limit } = req.query;
     const where = {};
 
     if (saison) {
@@ -152,11 +152,21 @@ exports.getAllEvents = async (req, res) => {
       };
     }
 
+    // Pagination parameters
+    const pageNumber = page ? parseInt(page) : 1;
+    const pageSize = limit ? parseInt(limit) : 100; // Default 100 items per page
+    const skip = (pageNumber - 1) * pageSize;
+
+    // Get total count for pagination metadata
+    const totalCount = await db.event.count({ where });
+
     const events = await db.event.findMany({
       where,
       orderBy: {
         date: 'asc',
       },
+      skip,
+      take: pageSize,
       include: {
         registrations: {
           include: {
@@ -184,7 +194,18 @@ exports.getAllEvents = async (req, res) => {
       };
     });
 
-    res.status(200).json(eventsWithQuota);
+    // Return paginated response
+    res.status(200).json({
+      events: eventsWithQuota,
+      pagination: {
+        page: pageNumber,
+        limit: pageSize,
+        totalCount,
+        totalPages: Math.ceil(totalCount / pageSize),
+        hasNextPage: pageNumber < Math.ceil(totalCount / pageSize),
+        hasPreviousPage: pageNumber > 1,
+      },
+    });
   } catch (error) {
     console.error('Get all events error:', error);
     res.status(500).json({
