@@ -60,7 +60,8 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(clientBuildPath));
 
   // Toutes les routes non-API renvoient index.html (pour le routing React)
-  app.get('*', (req, res) => {
+  // Utilisation de app.use au lieu de app.get('*') pour compatibilité Express 5
+  app.use((req, res) => {
     res.sendFile(path.join(clientBuildPath, 'index.html'));
   });
 } else {
