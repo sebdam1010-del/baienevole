@@ -181,12 +181,25 @@ const EventDetail = () => {
 
           {/* Event content */}
           <div className="flex-1 space-y-4">
-            <h1
-              className="text-3xl"
-              style={{ fontFamily: 'var(--font-family-protest)', color: 'var(--color-baie-navy)' }}
-            >
-              {event.nom}
-            </h1>
+            <div>
+              <h1
+                className="text-3xl"
+                style={{ fontFamily: 'var(--font-family-protest)', color: 'var(--color-baie-navy)' }}
+              >
+                {event.nom}
+              </h1>
+              {event.urlSite && (
+                <a
+                  href={event.urlSite}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 mt-2 text-sm hover:underline"
+                  style={{ color: 'var(--color-baie-green)' }}
+                >
+                  🔗 Voir l'événement sur le site officiel
+                </a>
+              )}
+            </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
