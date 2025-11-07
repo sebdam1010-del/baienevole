@@ -5,6 +5,7 @@
 #  - PM2 detection & startup fixed
 #  - Non-root app user (least privilege)
 #  - npm ci fallback when no lockfile
+#  - NGINX configuration removed
 # ============================================================
 
 set -Eeuo pipefail
@@ -19,7 +20,7 @@ DEFAULT_APP_DIR="${DEFAULT_APP_DIR:-/var/www/baienevole}"
 REPO_URL_DEFAULT="https://github.com/sebdam1010-del/baienevole.git"
 REPO_URL="${REPO_URL:-$REPO_URL_DEFAULT}"
 NODE_VERSION_MAJOR="${NODE_VERSION:-18}"
-NGINX_CONF=""  # défini après APP_NAME
+
 DOMAIN=""      # défini à la config
 APP_DIR=""     # défini à la config
 USE_SSH=false
@@ -122,14 +123,6 @@ check_prerequisites() {
   # pm2
   resolve_pm2
 
-  # nginx
-  if ! command -v nginx >/dev/null 2>&1; then
-    print_warning "Nginx non installé. Installation..."
-    apt-get update
-    apt-get install -y nginx
-  fi
-  print_success "Nginx OK"
-
   # git
   if ! command -v git >/dev/null 2>&1; then
     print_warning "Git non installé. Installation..."
@@ -140,8 +133,6 @@ check_prerequisites() {
 
 configure_installation() {
   print_step "Configuration de l'installation..."
-
-  NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
 
   echo -e "\n${YELLOW}Dossier d'installation:${NC}"
   read -r -p "Où installer l'application? (défaut: ${DEFAULT_APP_DIR}): " APP_DIR_INPUT || true
@@ -213,9 +204,13 @@ configure_env() {
     print_success "JWT_SECRET généré"
   fi
 
-  read -r -p "Port app (défaut 3000): " APP_PORT || true
+  echo -e "\n${YELLOW}Configuration réseau:${NC}"
+  echo "Le frontend React sera servi par le backend Express sur le même port."
+  echo "Pas besoin de configurer deux ports séparés."
+  echo ""
+  read -r -p "Port de l'application (défaut 3000): " APP_PORT || true
   APP_PORT="${APP_PORT:-3000}"
-  read -r -p "Nom de domaine (ex: baienevole.com): " DOMAIN || true
+  read -r -p "Nom de domaine (ex: baienevole.com, vide pour local): " DOMAIN || true
 
   read -r -p "SMTP Host: " SMTP_HOST || true
   read -r -p "SMTP Port (défaut 587): " SMTP_PORT || true
@@ -339,48 +334,11 @@ EOF
   print_step "Activation du démarrage auto PM2..."
   local NODE_BIN; NODE_BIN="$(dirname "$(command -v node)")"
   local PM2_BIN_DIR; PM2_BIN_DIR="$(dirname "$PM2")"
-  # On laisse PM2 générer la commande systemd ; on passe PATH complet pour l’unité
   env PATH="$PATH:$NODE_BIN:$PM2_BIN_DIR" "$PM2" startup systemd -u "$DEPLOY_USER" --hp "$DEPLOY_HOME" || {
     print_warning "pm2 startup a retourné un code ≠ 0. Si besoin, copie/colle la commande affichée par PM2, puis exécute 'pm2 save' en tant que ${DEPLOY_USER}."
   }
 
   print_success "Application démarrée via PM2 (user: ${DEPLOY_USER})"
-}
-
-setup_nginx() {
-  print_step "Configuration Nginx..."
-  if [[ -z "${DOMAIN:-}" ]]; then
-    print_warning "Pas de domaine, Nginx non configuré (l'app écoute sur le port)."
-    return
-  fi
-
-  NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
-  cat > "$NGINX_CONF" <<EOF
-server {
-    listen 80;
-    server_name ${DOMAIN} www.${DOMAIN};
-
-    location / {
-        proxy_pass http://localhost:${APP_PORT};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_cache_bypass \$http_upgrade;
-    }
-
-    access_log /var/log/nginx/${APP_NAME}_access.log;
-    error_log  /var/log/nginx/${APP_NAME}_error.log;
-}
-EOF
-
-  ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/
-  nginx -t
-  systemctl reload nginx
-  print_success "Nginx configuré et rechargé"
 }
 
 setup_backup_cron() {
@@ -417,19 +375,28 @@ show_summary() {
   echo -e "${GREEN}========================================${NC}\n"
 
   echo -e "${BLUE}Infos:${NC}"
-  echo -e "  📁 Répertoire: ${APP_DIR}"
-  echo -e "  👤 User PM2:   ${DEPLOY_USER}"
-  echo -e "  🚀 Port:       ${APP_PORT}"
+  echo -e "  📁 Répertoire:     ${APP_DIR}"
+  echo -e "  👤 User PM2:       ${DEPLOY_USER}"
+  echo -e "  🚀 Port:           ${APP_PORT}"
+  echo -e "  📦 Architecture:   Frontend + Backend sur le même port"
   if [[ -n "${DOMAIN:-}" ]]; then
-    echo -e "  🌐 URL:        https://${DOMAIN}"
+    echo -e "  🌐 URL:            https://${DOMAIN}"
+    echo -e "  📝 Note:           Configurez votre reverse proxy (nginx/caddy) vers le port ${APP_PORT}"
   else
-    echo -e "  🌐 URL:        http://localhost:${APP_PORT}"
+    echo -e "  🌐 URL:            http://localhost:${APP_PORT}"
   fi
+
+  echo -e "\n${BLUE}Détails:${NC}"
+  echo -e "  • Le backend Express sert également le frontend React buildé"
+  echo -e "  • Routes API:      http://localhost:${APP_PORT}/api/*"
+  echo -e "  • Frontend React:  http://localhost:${APP_PORT}/*"
+  echo -e "  • API Docs:        http://localhost:${APP_PORT}/api-docs"
 
   echo -e "\n${BLUE}Commandes utiles:${NC}"
   echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} status"
   echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} logs ${APP_NAME}"
   echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} restart ${APP_NAME}"
+  echo -e "  sudo -H -u ${DEPLOY_USER} ${PM2} reload ${APP_NAME}  # Zero downtime restart"
 }
 
 main() {
@@ -449,7 +416,6 @@ main() {
   setup_database
   build_frontend
   setup_pm2
-  setup_nginx
   setup_backup_cron
   setup_reminders_cron
   show_summary
