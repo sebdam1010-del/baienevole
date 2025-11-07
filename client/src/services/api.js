@@ -45,9 +45,13 @@ export const getImageUrl = (imagePath) => {
     return imagePath;
   }
 
-  // Sinon, construire l'URL complète avec le backend
-  const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
-  return `${backendUrl}${imagePath}`;
+  // Si le chemin commence déjà par /, c'est un chemin absolu relatif au serveur
+  if (imagePath.startsWith('/')) {
+    return imagePath;
+  }
+
+  // Sinon, ajouter le préfixe /images/
+  return `/images/${imagePath}`;
 };
 
 export default api;
